@@ -84,7 +84,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Load accessibility settings
     const savedAccessibility = localStorage.getItem("accessibility_settings");
-    if (savedAccessibility) {
+    if (savedAccessibility !== null) {
       try {
         setAccessibility(JSON.parse(savedAccessibility));
       } catch (e) {
