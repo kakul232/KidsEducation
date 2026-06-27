@@ -9,6 +9,7 @@ import { StarBadge } from "../../components/StarBadge";
 import { StreakBadge } from "../../components/StreakBadge";
 import { PlayCard } from "../../components/PlayCard";
 import { ChunkyButton } from "../../components/ChunkyButton";
+import KidsLoader from "../../components/KidsLoader";
 
 const DIFFICULTY_SYMBOLS: Record<string, { symbol: string; label: string; color: string; bg: string }> = {
   Easy: { symbol: "🌱", label: "Seedling", color: "#15803d", bg: "#d1fae5" },
@@ -21,6 +22,7 @@ export const Dashboard: React.FC = () => {
   const [games, setGames] = useState<Game[]>([]);
   const [selectedSubject, setSelectedSubject] = useState("math");
   const [completedGames, setCompletedGames] = useState<Record<string, string>>({});
+  const [isLoading, setIsLoading] = useState(LocalDB.getCachedGames().length === 0);
 
   useEffect(() => {
     // 1. Helper to render games & logs from a given data set
@@ -79,6 +81,8 @@ export const Dashboard: React.FC = () => {
         renderGamesAndLogs(freshGames, freshLogs);
       } catch (err) {
         console.warn("Background revalidation failed (offline/error):", err);
+      } finally {
+        setIsLoading(false);
       }
     };
     
@@ -105,6 +109,7 @@ export const Dashboard: React.FC = () => {
 
   return (
     <div className="container animate-slide-up">
+      {isLoading && <KidsLoader />}
       {/* Student Profile Header using Reusable PlayCard, AvatarIcon, StarBadge and StreakBadge */}
       <PlayCard
         style={{

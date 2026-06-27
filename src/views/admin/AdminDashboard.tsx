@@ -52,6 +52,8 @@ export const AdminDashboard: React.FC = () => {
   const [assignedStudentId, setAssignedStudentId] = useState("");
   const [gameInstruction, setGameInstruction] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isAuthLoading, setIsAuthLoading] = useState(false);
+  const [isDataLoading, setIsDataLoading] = useState(false);
   const [generatedGame, setGeneratedGame] = useState<GeneratedGameResponse | null>(null);
   const [generationError, setGenerationError] = useState("");
   const [editingGameId, setEditingGameId] = useState<string | null>(null);
@@ -65,6 +67,7 @@ export const AdminDashboard: React.FC = () => {
 
   useEffect(() => {
     if (isAdminLoggedIn) {
+      setIsAuthLoading(false);
       loadData();
     }
   }, [isAdminLoggedIn]);
@@ -74,6 +77,7 @@ export const AdminDashboard: React.FC = () => {
   }, [geminiApiKey]);
 
   const loadData = async () => {
+    setIsDataLoading(true);
     // Pre-populate defaults under authenticated admin context
     await LocalDB.prepopulateDefaultGames();
 
@@ -88,6 +92,8 @@ export const AdminDashboard: React.FC = () => {
       setLogs(logsList);
     } catch (e) {
       console.error("loadData failed in AdminDashboard:", e);
+    } finally {
+      setIsDataLoading(false);
     }
   };
 
@@ -98,6 +104,7 @@ export const AdminDashboard: React.FC = () => {
       return;
     }
     setAuthError("");
+    setIsAuthLoading(true);
     try {
       await logInAdmin(email, password);
     } catch (err: any) {
@@ -106,6 +113,7 @@ export const AdminDashboard: React.FC = () => {
       } else {
         setAuthError(err.message || "Authentication failed. Try again.");
       }
+      setIsAuthLoading(false);
     }
   };
 
@@ -239,6 +247,7 @@ export const AdminDashboard: React.FC = () => {
   if (!isAdminLoggedIn) {
     return (
       <div className="container animate-slide-up" style={{ justifyContent: "center" }}>
+        {isAuthLoading && <KidsLoader />}
         <div className="play-card" style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
           <div style={{ textAlign: "center" }}>
             <div
@@ -323,7 +332,7 @@ export const AdminDashboard: React.FC = () => {
   // Render Admin Dashboard layout
   return (
     <div style={{ width: "100%", maxWidth: "800px", margin: "0 auto", padding: "24px" }} className="animate-slide-up">
-      {isGenerating && <KidsLoader />}
+      {(isGenerating || isDataLoading) && <KidsLoader />}
       
       {/* Admin Header */}
       <div

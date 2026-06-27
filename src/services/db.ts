@@ -8,6 +8,11 @@ export interface Student {
   stars: number;
   streak: number;
   lastActive: string;
+  deviceId?: string;
+  ip?: string;
+  userAgent?: string;
+  browser?: string;
+  deviceType?: string;
 }
 
 export interface ActivityLog {

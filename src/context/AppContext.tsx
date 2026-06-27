@@ -3,6 +3,7 @@ import LocalDB from "../services/db";
 import type { Student, Game, ActivityLog } from "../services/db";
 import { auth as firebaseAuth } from "../services/firebase";
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
+import { getClientDetails } from "../utils/device";
 
 export type ViewState = "onboarding" | "dashboard" | "game_player" | "admin_auth" | "admin_dashboard";
 
@@ -22,7 +23,7 @@ interface AppContextType {
   geminiApiKey: string;
   speakText: (text: string) => void;
   setView: (view: ViewState) => void;
-  setOnboarding: (name: string, avatar: string) => void;
+  setOnboarding: (name: string, avatar: string) => Promise<void>;
   setPlayingGame: (game: Game | null) => void;
   updateAccessibility: (config: Partial<AccessibilityConfig>) => void;
   saveApiKey: (key: string) => void;
@@ -130,21 +131,66 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const setOnboarding = (name: string, avatar: string) => {
-    const newStudent: Student = {
-      id: "std_" + Math.random().toString(36).substr(2, 9),
-      name,
-      avatar,
-      stars: 0,
-      streak: 1,
-      lastActive: new Date().toISOString()
-    };
+  const setOnboarding = async (name: string, avatar: string) => {
+    // Collect IP, Device ID, and system metadata
+    const details = await getClientDetails();
     
-    LocalDB.saveStudent(newStudent);
-    localStorage.setItem("active_student_id", newStudent.id);
-    setCurrentStudent(newStudent);
-    setCurrentView("dashboard");
-    speakText(`Great job, ${name}! Let's start learning together.`);
+    // Retrieve all existing registered students (live or cache)
+    const existingStudents = await LocalDB.getStudents();
+    const cleanName = name.trim().toLowerCase();
+
+    // Search for a matching student (case-insensitive name AND either matching deviceId or matching IP)
+    const matchedStudent = existingStudents.find(s => {
+      const sName = s.name.trim().toLowerCase();
+      if (sName !== cleanName) return false;
+      
+      if (s.deviceId && s.deviceId === details.deviceId) return true;
+      if (s.ip && details.ip && s.ip === details.ip) return true;
+      
+      return false;
+    });
+
+    if (matchedStudent) {
+      console.log("Matching student profile found! Logging into existing account:", matchedStudent);
+      
+      const updatedStudent: Student = {
+        ...matchedStudent,
+        avatar, // Update avatar choice if changed
+        lastActive: new Date().toISOString(),
+        deviceId: details.deviceId,
+        ip: details.ip || matchedStudent.ip || "",
+        userAgent: details.userAgent,
+        browser: details.browser,
+        deviceType: details.deviceType
+      };
+
+      await LocalDB.saveStudent(updatedStudent);
+      localStorage.setItem("active_student_id", updatedStudent.id);
+      setCurrentStudent(updatedStudent);
+      setCurrentView("dashboard");
+      speakText(`Welcome back, ${name}! Let's start learning together.`);
+    } else {
+      // Create a new unique student profile
+      const newStudent: Student = {
+        id: "std_" + Math.random().toString(36).substr(2, 9),
+        name: name.trim(),
+        avatar,
+        stars: 0,
+        streak: 1,
+        lastActive: new Date().toISOString(),
+        deviceId: details.deviceId,
+        ip: details.ip,
+        userAgent: details.userAgent,
+        browser: details.browser,
+        deviceType: details.deviceType
+      };
+
+      await LocalDB.saveStudent(newStudent);
+      localStorage.setItem("active_student_id", newStudent.id);
+      setCurrentStudent(newStudent);
+      setCurrentView("dashboard");
+      speakText(`Great job, ${name}! Let's start learning together.`);
+    }
   };
 
   const updateAccessibility = (config: Partial<AccessibilityConfig>) => {

@@ -4,25 +4,35 @@ import { Sparkles, GraduationCap } from "lucide-react";
 import { AVATARS } from "../../utils/constants";
 import { ChunkyButton } from "../../components/ChunkyButton";
 import { PlayCard } from "../../components/PlayCard";
+import KidsLoader from "../../components/KidsLoader";
 
 export const Onboarding: React.FC = () => {
   const { setOnboarding, setView } = useApp();
   const [name, setName] = useState("");
   const [selectedAvatar, setSelectedAvatar] = useState("bear");
   const [errorMsg, setErrorMsg] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
       setErrorMsg("Please tell us your name! 😊");
       return;
     }
     setErrorMsg("");
-    setOnboarding(name.trim(), selectedAvatar);
+    setIsLoading(true);
+    try {
+      await setOnboarding(name.trim(), selectedAvatar);
+    } catch (err) {
+      console.error("Onboarding failed:", err);
+      setErrorMsg("Oops! Something went wrong. Try again! 😊");
+      setIsLoading(false);
+    }
   };
 
   return (
     <div className="container animate-slide-up" style={{ justifyContent: "center" }}>
+      {isLoading && <KidsLoader />}
       <PlayCard style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
         
         {/* Title & Welcome */}
