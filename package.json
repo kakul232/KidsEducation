@@ -7,9 +7,16 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "android:init": "npx cap init \"Play Studio\" \"com.playstudio.app\" --web-dir=dist && npx cap add android",
+    "android:sync": "npm run build && npx cap sync",
+    "android:open": "npx cap open android",
+    "android:export": "npm run build && npx cap sync && cd android && ./gradlew assembleDebug && cd .."
   },
   "dependencies": {
+    "@capacitor/android": "^8.4.1",
+    "@capacitor/cli": "^8.4.1",
+    "@capacitor/core": "^8.4.1",
     "canvas-confetti": "^1.9.4",
     "firebase": "^12.15.0",
     "lucide-react": "^1.21.0",
