@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Marble Addition</title>
+  <style>
+    body {
+      font-family: 'Comic Sans MS', system-ui, sans-serif;
+      text-align: center;
+      padding: 12px;
+      margin: 0;
+      background: #f8fafc; /* Soft slate/blue background */
+      color: #333;
+      user-select: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      overflow: hidden;
+      box-sizing: border-box;
+    }
+    
+    #game-container {
+      width: 100%;
+      max-width: 360px;
+      height: 100%;
+      max-height: 600px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 10px;
+      box-sizing: border-box;
+    }
+
+    #game-box {
+      background: #ffffff;
+      border: 4px solid #6366f1; /* Indigo border */
+      border-radius: 28px;
+      padding: 16px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      flex: 1;
+    }
+
+    h2 { 
+      margin: 0 0 10px 0; 
+      color: #4f46e5; 
+      font-size: 1.5rem;
+    }
+
+    #hud {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: #475569;
+      background: #e0e7ff;
+      padding: 8px 16px;
+      border-radius: 14px;
+      margin-bottom: 10px;
+    }
+
+    .instruction { 
+      font-size: 1.2rem; 
+      font-weight: bold; 
+      margin-bottom: 10px; 
+      color: #1f2937;
+    }
+
+    .marbles-area {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 12px;
+      margin: 15px 0;
+      flex-wrap: wrap;
+    }
+
+    .group {
+      background: #f1f5f9;
+      border: 3px dashed #cbd5e1;
+      border-radius: 20px;
+      padding: 12px;
+      min-width: 90px;
+      min-height: 70px;
+      display: flex;
+      justify-content: center;
+      align-content: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      box-sizing: border-box;
+    }
+
+    .plus { 
+      font-size: 2.2rem; 
+      font-weight: bold; 
+      color: #6366f1; 
+      user-select: none;
+    }
+
+    .marble {
+      width: 24px;
+      height: 24px;
+      background: radial-gradient(circle at 7px 7px, #38bdf8, #0284c7);
+      border-radius: 50%;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.15);
+      filter: drop-shadow(0 1px 2px rgba(0,0,0,0.05));
+    }
+
+    .marble.red {
+      background: radial-gradient(circle at 7px 7px, #fca5a5, #dc2626);
+    }
+
+    .options {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin: 10px 0;
+    }
+
+    .btn {
+      font-family: inherit;
+      background: #ffffff;
+      border: 3px solid #e2e8f0;
+      border-bottom: 7px solid #e2e8f0;
+      border-radius: 18px;
+      padding: 12px;
+      font-size: 1.5rem;
+      font-weight: bold;
+      cursor: pointer;
+      color: #1e293b;
+      transition: transform 0.1s;
+    }
+
+    .btn:active:not(:disabled) {
+      transform: translateY(4px);
+      border-bottom-width: 3px;
+    }
+
+    .btn.correct { 
+      background: #d1fae5; 
+      border-color: #10b981; 
+      border-bottom: 7px solid #059669;
+      color: #065f46;
+    }
+
+    .btn.incorrect { 
+      background: #fee2e2; 
+      border-color: #ef4444; 
+      border-bottom: 7px solid #b91c1c;
+      color: #991b1b;
+    }
+
+    #feedback {
+      font-size: 1.1rem;
+      font-weight: bold;
+      color: #0d9488;
+      min-height: 28px;
+      margin: 8px 0;
+    }
+
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(255, 255, 255, 0.96);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 10;
+      text-align: center;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+
+    .start-btn {
+      font-family: inherit;
+      padding: 16px 36px;
+      font-size: 1.5rem;
+      border-radius: 20px;
+      border: none;
+      background: #6366f1;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      box-shadow: 0 6px #4f46e5;
+    }
+
+    .start-btn:active {
+      transform: translateY(4px);
+      box-shadow: 0 2px #4f46e5;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="game-container">
+    <div id="game-box">
+      <div>
+        <h2>Marble Addition 🧮</h2>
+        <div id="hud">
+          <span>Round: <span id="round-num">1</span>/10</span>
+          <span style="color:#6366f1;">⭐ <span id="score-num">0</span></span>
+        </div>
+      </div>
+
+      <div>
+        <div class="instruction">How many marbles are there altogether?</div>
+        <div class="marbles-area">
+          <div class="group" id="grp1"></div>
+          <div class="plus">+</div>
+          <div class="group" id="grp2"></div>
+        </div>
+      </div>
+
+      <div>
+        <div id="feedback">Tap the correct total!</div>
+        <div class="options" id="opts"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="overlay" class="overlay">
+    <h2 id="msg" style="color: #6366f1; font-size: 2.2rem; margin-bottom: 20px;">Ready to add some marbles? 🔵🔴</h2>
+    <button class="start-btn" onclick="startGame()">▶ Start Playing</button>
+  </div>
+  
+  <script>
+    let score = 0;
+    let roundsPlayed = 0;
+    let answer = 0;
+    const usedCombinations = [];
+
+    const grp1 = document.getElementById('grp1');
+    const grp2 = document.getElementById('grp2');
+    const optsArea = document.getElementById('opts');
+    const feedbackEl = document.getElementById('feedback');
+    const roundNumEl = document.getElementById('round-num');
+    const scoreNumEl = document.getElementById('score-num');
+    const overlay = document.getElementById('overlay');
+    const msgEl = document.getElementById('msg');
+    const startBtn = overlay.querySelector('.start-btn');
+
+    function startGame() {
+      score = 0;
+      roundsPlayed = 0;
+      usedCombinations.length = 0;
+      overlay.style.display = 'none';
+      scoreNumEl.innerText = score;
+      nextRound();
+    }
+
+    function nextRound() {
+      roundsPlayed++;
+      if (roundsPlayed > 10) {
+        endGame();
+        return;
+      }
+
+      roundNumEl.innerText = roundsPlayed;
+      feedbackEl.innerText = 'Tap the correct total!';
+
+      // 1. Generate a unique addition pair combination (each number 1 to 4)
+      let num1, num2;
+      let attempts = 0;
+      do {
+        num1 = Math.floor(Math.random() * 4) + 1; // 1 to 4
+        num2 = Math.floor(Math.random() * 4) + 1; // 1 to 4
+        attempts++;
+      } while (usedCombinations.includes(`${num1}+${num2}`) && attempts < 15);
+      
+      usedCombinations.push(`${num1}+${num2}`);
+      answer = num1 + num2;
+
+      // 2. Draw marbles inside both slots
+      grp1.innerHTML = '';
+      for (let i = 0; i < num1; i++) {
+        let m = document.createElement('div');
+        m.className = 'marble';
+        grp1.appendChild(m);
+      }
+
+      grp2.innerHTML = '';
+      for (let i = 0; i < num2; i++) {
+        let m = document.createElement('div');
+        m.className = 'marble red';
+        grp2.appendChild(m);
+      }
+      
+      // 3. Set up button options (always include answer)
+      let options = new Set([answer]);
+      while (options.size < 3) {
+        let val = Math.floor(Math.random() * 8) + 1; // 1 to 8
+        options.add(val);
+      }
+      let optionsArray = Array.from(options).sort((a, b) => a - b);
+      
+      // 4. Render buttons
+      optsArea.innerHTML = '';
+      optionsArray.forEach(val => {
+        let b = document.createElement('button');
+        b.className = 'btn';
+        b.innerText = val;
+        b.onclick = () => checkAnswer(val, b);
+        optsArea.appendChild(b);
+      });
+    }
+
+    function checkAnswer(val, clickedBtn) {
+      const btns = optsArea.getElementsByTagName('button');
+      for (let b of btns) {
+        b.disabled = true;
+        if (parseInt(b.innerText) === answer) {
+          b.className = 'btn correct';
+        } else if (parseInt(b.innerText) === val) {
+          b.className = 'btn incorrect';
+        }
+      }
+
+      if (val === answer) {
+        score++;
+        scoreNumEl.innerText = score;
+        feedbackEl.innerText = 'Superb addition! 🌟';
+        
+        // Progress hook
+        window.parent.postMessage({ type: 'game_attempt', success: true }, '*');
+        
+        setTimeout(nextRound, 1500);
+      } else {
+        feedbackEl.innerText = 'Nice try! Try the next one!';
+        
+        // Attempt hook
+        window.parent.postMessage({ type: 'game_attempt', success: false }, '*');
+        
+        setTimeout(nextRound, 1800);
+      }
+    }
+
+    function endGame() {
+      overlay.style.display = 'flex';
+      msgEl.innerHTML = `🏆 addition complete!<br><br>You correctly added ${score} out of 10 tasks! 🧮`;
+      
+      // Send final completion message with full scores
+      window.parent.postMessage({ 
+        type: 'game_complete', 
+        success: true, 
+        correctCount: score, 
+        incorrectCount: 10 - score 
+      }, '*');
+      
+      startBtn.innerText = '▶ Play Again';
+    }
+  </script>
+</body>
+
+</html>
