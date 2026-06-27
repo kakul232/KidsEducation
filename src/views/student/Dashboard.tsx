@@ -10,27 +10,76 @@ import { StreakBadge } from "../../components/StreakBadge";
 import { PlayCard } from "../../components/PlayCard";
 import { ChunkyButton } from "../../components/ChunkyButton";
 
+const DIFFICULTY_SYMBOLS: Record<string, { symbol: string; label: string; color: string; bg: string }> = {
+  Easy: { symbol: "🌱", label: "Seedling", color: "#15803d", bg: "#d1fae5" },
+  Medium: { symbol: "🌿", label: "Sapling", color: "#c2410c", bg: "#ffedd5" },
+  Hard: { symbol: "🌳", label: "Big Tree", color: "#b91c1c", bg: "#fee2e2" }
+};
+
 export const Dashboard: React.FC = () => {
   const { currentStudent, setPlayingGame } = useApp();
   const [games, setGames] = useState<Game[]>([]);
   const [selectedSubject, setSelectedSubject] = useState("math");
+  const [completedGames, setCompletedGames] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    // Fetch published games from DB
-    const fetchGames = async () => {
-      const allGames = await LocalDB.getGames();
+    // Fetch published games & logs from DB
+    const fetchGamesAndLogs = async () => {
+      const [allGames, allLogs] = await Promise.all([
+        LocalDB.getGames(),
+        LocalDB.getLogs()
+      ]);
       const list = allGames.filter(
         g => g.published && (!g.assignedStudentId || g.assignedStudentId === currentStudent?.id)
       );
-      setGames(list);
+
+      // Build completed games lookup map for current student
+      const completedMap: Record<string, string> = {};
+      if (currentStudent) {
+        const studentLogs = allLogs.filter(l => l.studentId === currentStudent.id);
+        studentLogs.forEach(log => {
+          if (log.completionRate === 100) {
+            completedMap[log.gameId] = log.rewardEarned || "⭐ Completed";
+          }
+        });
+        setCompletedGames(completedMap);
+      }
+
+      // Sort: Uncompleted games first, completed games pushed to the bottom
+      const sorted = [...list].sort((a, b) => {
+        const aCompleted = !!completedMap[a.id];
+        const bCompleted = !!completedMap[b.id];
+        
+        if (aCompleted && !bCompleted) return 1;
+        if (!aCompleted && bCompleted) return -1;
+        
+        // Secondary sort: Newest first
+        const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return bTime - aTime;
+      });
+
+      setGames(sorted);
     };
-    fetchGames();
+    fetchGamesAndLogs();
   }, [currentStudent]);
 
   const handleStudentLogOut = () => {
     localStorage.removeItem("active_student_id");
     // Reload page or update view to reset state
     window.location.reload();
+  };
+
+  const isNew = (createdAtString?: string) => {
+    if (!createdAtString) return false;
+    try {
+      const createdTime = new Date(createdAtString).getTime();
+      const currentTime = new Date().getTime();
+      const diffHours = (currentTime - createdTime) / (1000 * 60 * 60);
+      return diffHours < 24; // Show "NEW" tag if created in the last 24 hours
+    } catch (e) {
+      return false;
+    }
   };
 
   return (
@@ -122,7 +171,10 @@ export const Dashboard: React.FC = () => {
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
-                backgroundColor: "var(--bg-secondary)",
+                backgroundColor: completedGames[game.id] ? "#f0fdf4" : "var(--bg-secondary)",
+                borderColor: completedGames[game.id] ? "#86efac" : "#e2e8f0",
+                borderWidth: "3px",
+                borderStyle: "solid",
                 boxShadow: "0 6px 0 rgba(0,0,0,0.05)",
                 padding: "20px"
               }}
@@ -132,14 +184,35 @@ export const Dashboard: React.FC = () => {
                   style={{
                     fontSize: "1.2rem",
                     fontWeight: "800",
-                    display: "block",
+                    display: "flex",
+                    alignItems: "center",
                     color: "var(--text-primary)",
                     wordSpacing: "0.1em"
                   }}
                 >
                   {game.title}
+                  
+                  {/* Animated NEW Tag for newly published games */}
+                  {isNew(game.createdAt) && (
+                    <span
+                      className="animate-tag-pulse"
+                      style={{
+                        fontSize: "0.75rem",
+                        backgroundColor: "#f43f5e",
+                        color: "#ffffff",
+                        padding: "2px 8px",
+                        borderRadius: "8px",
+                        fontWeight: "900",
+                        letterSpacing: "0.05em",
+                        marginLeft: "10px",
+                        lineHeight: "1"
+                      }}
+                    >
+                      NEW
+                    </span>
+                  )}
                 </span>
-                <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
+                <div style={{ display: "flex", gap: "8px", marginTop: "8px", flexWrap: "wrap" }}>
                   <span
                     style={{
                       fontSize: "0.8rem",
@@ -152,28 +225,46 @@ export const Dashboard: React.FC = () => {
                   >
                     Topic: {game.topic}
                   </span>
-                  <span
-                    style={{
-                      fontSize: "0.8rem",
-                      backgroundColor:
-                        game.difficulty === "Easy"
-                          ? "#d1fae5"
-                          : game.difficulty === "Medium"
-                          ? "#ffedd5"
-                          : "#fee2e2",
-                      color:
-                        game.difficulty === "Easy"
-                          ? "#065f46"
-                          : game.difficulty === "Medium"
-                          ? "#9a3412"
-                          : "#991b1b",
-                      padding: "4px 10px",
-                      borderRadius: "10px",
-                      fontWeight: "700"
-                    }}
-                  >
-                    {game.difficulty}
-                  </span>
+                  {(() => {
+                    const diff = DIFFICULTY_SYMBOLS[game.difficulty] || DIFFICULTY_SYMBOLS.Easy;
+                    return (
+                      <span
+                        style={{
+                          fontSize: "0.8rem",
+                          backgroundColor: diff.bg,
+                          color: diff.color,
+                          padding: "4px 10px",
+                          borderRadius: "10px",
+                          fontWeight: "800",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "4px"
+                        }}
+                      >
+                        <span>{diff.symbol}</span>
+                        <span>{diff.label}</span>
+                      </span>
+                    );
+                  })()}
+
+                  {/* Completed star rewards indicator */}
+                  {completedGames[game.id] && (
+                    <span
+                      style={{
+                        fontSize: "0.8rem",
+                        backgroundColor: "#d1fae5",
+                        color: "#065f46",
+                        padding: "4px 10px",
+                        borderRadius: "10px",
+                        fontWeight: "800",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "4px"
+                      }}
+                    >
+                      ✓ Done ({completedGames[game.id]})
+                    </span>
+                  )}
                 </div>
               </div>
 

@@ -135,15 +135,20 @@ export const AdminDashboard: React.FC = () => {
       htmlContent: draftCode, // Save current draft code (which includes any admin edits!)
       published: true,
       createdAt: new Date().toISOString(),
-      assignedStudentId: assignedStudentId || undefined
+      assignedStudentId: assignedStudentId || ""
     };
 
-    await LocalDB.saveGame(newGame);
-    await loadData();
-    alert(editingGameId ? "Game successfully updated! ✏️" : "Game successfully published to students! 🎉");
-    setGeneratedGame(null);
-    setEditingGameId(null);
-    setActiveTab("games");
+    try {
+      await LocalDB.saveGame(newGame);
+      await loadData();
+      alert(editingGameId ? "Game successfully updated! ✏️" : "Game successfully published to students! 🎉");
+      setGeneratedGame(null);
+      setEditingGameId(null);
+      setActiveTab("games");
+    } catch (err: any) {
+      console.error("Publish failed:", err);
+      alert("Failed to publish game: " + (err.message || "Unknown database error."));
+    }
   };
 
   const handleEditGame = (game: Game) => {

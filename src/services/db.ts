@@ -525,6 +525,7 @@ export const LocalDB = {
       await setDoc(doc(db, "games", game.id), game);
     } catch (e) {
       console.error("Firestore saveGame failed", e);
+      throw e;
     }
   },
 
