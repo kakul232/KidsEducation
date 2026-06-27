@@ -1,4 +1,6 @@
 import { validateGameCode } from "./validator";
+import frogHopperRaw from "../game/Frog-Hopper.html?raw";
+import balloonCountingRaw from "../game/Ballon-counting.html?raw";
 
 export interface GeneratedGameResponse {
   title: string;
@@ -363,6 +365,18 @@ export async function generateGame(
 Subject: ${subject}
 Topic: ${topic}
 Difficulty: ${difficulty}
+
+Here are reference examples of high-quality, verified HTML games from our games folder showing how the layout, mobile-first touch/swipe controls (direct canvas gestures, no D-pad), aspect ratios, and event triggers should be implemented:
+
+EXAMPLE 1: Balloon Pop Counting Game
+\`\`\`html
+${balloonCountingRaw}
+\`\`\`
+
+EXAMPLE 2: Frog River-Crossing Counting Game
+\`\`\`html
+${frogHopperRaw}
+\`\`\`
 
 Strict Constraints:
 1. Return ONLY a valid JSON object in this format:

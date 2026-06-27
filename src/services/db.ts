@@ -474,10 +474,12 @@ export const LocalDB = {
   async getStudents(): Promise<Student[]> {
     try {
       const snap = await getDocs(collection(db, "students"));
-      return snap.docs.map(doc => doc.data() as Student);
+      const list = snap.docs.map(doc => doc.data() as Student);
+      this.setCachedStudents(list);
+      return list;
     } catch (e) {
-      console.error("Firestore getStudents failed", e);
-      return [];
+      console.warn("Firestore getStudents failed. Serving cached fallback:", e);
+      return this.getCachedStudents();
     }
   },
 
@@ -487,13 +489,20 @@ export const LocalDB = {
       return snap.exists() ? (snap.data() as Student) : undefined;
     } catch (e) {
       console.error("Firestore getStudent failed", e);
-      return undefined;
+      const cached = this.getCachedStudents();
+      return cached.find(s => s.id === id);
     }
   },
 
   async saveStudent(student: Student): Promise<void> {
     try {
       await setDoc(doc(db, "students", student.id), student);
+      // Update cache
+      const cached = this.getCachedStudents();
+      const idx = cached.findIndex(s => s.id === student.id);
+      if (idx > -1) cached[idx] = student;
+      else cached.push(student);
+      this.setCachedStudents(cached);
     } catch (e) {
       console.error("Firestore saveStudent failed", e);
     }
@@ -501,28 +510,78 @@ export const LocalDB = {
 
   // Games CRUD
   async getGames(): Promise<Game[]> {
+    const isOffline = !navigator.onLine;
+    if (isOffline) {
+      console.log("Offline detected. Serving games from local storage cache...");
+      const cached = this.getCachedGames();
+      if (cached && cached.length > 0) return cached;
+      return this.getLocalGames();
+    }
+
     try {
       const snap = await getDocs(collection(db, "games"));
-      return snap.docs.map(doc => doc.data() as Game);
+      const list = snap.docs.map(doc => doc.data() as Game);
+      this.setCachedGames(list);
+      return list;
     } catch (e) {
-      console.error("Firestore getGames failed", e);
-      return [];
+      console.warn("Firestore getGames failed (possibly offline). Serving cached fallback...", e);
+      const cached = this.getCachedGames();
+      if (cached && cached.length > 0) return cached;
+      return this.getLocalGames();
     }
   },
 
   async getGame(id: string): Promise<Game | undefined> {
+    const isOffline = !navigator.onLine;
+    if (isOffline) {
+      const cached = this.getCachedGames();
+      const found = cached.find(g => g.id === id);
+      if (found) return found;
+      const locals = await this.getLocalGames();
+      return locals.find(g => g.id === id);
+    }
+
     try {
       const snap = await getDoc(doc(db, "games", id));
-      return snap.exists() ? (snap.data() as Game) : undefined;
+      if (snap.exists()) return snap.data() as Game;
+      
+      const cached = this.getCachedGames();
+      const found = cached.find(g => g.id === id);
+      if (found) return found;
+
+      const locals = await this.getLocalGames();
+      return locals.find(g => g.id === id);
     } catch (e) {
-      console.error("Firestore getGame failed", e);
-      return undefined;
+      console.warn("Firestore getGame failed (possibly offline). Loading from cached fallback...", e);
+      const cached = this.getCachedGames();
+      const found = cached.find(g => g.id === id);
+      if (found) return found;
+      const locals = await this.getLocalGames();
+      return locals.find(g => g.id === id);
+    }
+  },
+
+  async getLocalGames(): Promise<Game[]> {
+    try {
+      const res = await fetch("/local-games.json");
+      if (!res.ok) throw new Error("Server returned status " + res.status);
+      const list = await res.json();
+      return list;
+    } catch (err) {
+      console.error("Failed to load local fallback games index:", err);
+      return [];
     }
   },
 
   async saveGame(game: Game): Promise<void> {
     try {
       await setDoc(doc(db, "games", game.id), game);
+      // Update cache
+      const cached = this.getCachedGames();
+      const idx = cached.findIndex(g => g.id === game.id);
+      if (idx > -1) cached[idx] = game;
+      else cached.push(game);
+      this.setCachedGames(cached);
     } catch (e) {
       console.error("Firestore saveGame failed", e);
       throw e;
@@ -532,6 +591,9 @@ export const LocalDB = {
   async deleteGame(id: string): Promise<void> {
     try {
       await deleteDoc(doc(db, "games", id));
+      // Update cache
+      const cached = this.getCachedGames();
+      this.setCachedGames(cached.filter(g => g.id !== id));
     } catch (e) {
       console.error("Firestore deleteGame failed", e);
     }
@@ -541,19 +603,68 @@ export const LocalDB = {
   async getLogs(): Promise<ActivityLog[]> {
     try {
       const snap = await getDocs(collection(db, "analytics"));
-      return snap.docs.map(doc => doc.data() as ActivityLog);
+      const list = snap.docs.map(doc => doc.data() as ActivityLog);
+      this.setCachedLogs(list);
+      return list;
     } catch (e) {
       console.error("Firestore getLogs failed", e);
-      return [];
+      return this.getCachedLogs();
     }
   },
 
   async saveLog(log: ActivityLog): Promise<void> {
     try {
       await setDoc(doc(db, "analytics", log.id), log);
+      // Update cache
+      const cached = this.getCachedLogs();
+      cached.push(log);
+      this.setCachedLogs(cached);
     } catch (e) {
       console.error("Firestore saveLog failed", e);
     }
+  },
+
+  // Synchronous Cache Helpers (for immediate offline rendering)
+  getCachedStudents(): Student[] {
+    try {
+      const val = localStorage.getItem("cached_students");
+      return val ? JSON.parse(val) : [];
+    } catch (e) {
+      return [];
+    }
+  },
+  setCachedStudents(students: Student[]) {
+    try {
+      localStorage.setItem("cached_students", JSON.stringify(students));
+    } catch (e) {}
+  },
+
+  getCachedGames(): Game[] {
+    try {
+      const val = localStorage.getItem("cached_games");
+      return val ? JSON.parse(val) : [];
+    } catch (e) {
+      return [];
+    }
+  },
+  setCachedGames(games: Game[]) {
+    try {
+      localStorage.setItem("cached_games", JSON.stringify(games));
+    } catch (e) {}
+  },
+
+  getCachedLogs(): ActivityLog[] {
+    try {
+      const val = localStorage.getItem("cached_logs");
+      return val ? JSON.parse(val) : [];
+    } catch (e) {
+      return [];
+    }
+  },
+  setCachedLogs(logs: ActivityLog[]) {
+    try {
+      localStorage.setItem("cached_logs", JSON.stringify(logs));
+    } catch (e) {}
   }
 };
 

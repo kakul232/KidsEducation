@@ -15,7 +15,9 @@ import {
   AlertTriangle,
   Trash2,
   Lock,
-  Edit2
+  Edit2,
+  Eye,
+  EyeOff
 } from "lucide-react";
 
 export const AdminDashboard: React.FC = () => {
@@ -74,14 +76,18 @@ export const AdminDashboard: React.FC = () => {
     // Pre-populate defaults under authenticated admin context
     await LocalDB.prepopulateDefaultGames();
 
-    const [studentsList, gamesList, logsList] = await Promise.all([
-      LocalDB.getStudents(),
-      LocalDB.getGames(),
-      LocalDB.getLogs()
-    ]);
-    setStudents(studentsList);
-    setGames(gamesList);
-    setLogs(logsList);
+    try {
+      const [studentsList, gamesList, logsList] = await Promise.all([
+        LocalDB.getStudents(),
+        LocalDB.getGames(),
+        LocalDB.getLogs()
+      ]);
+      setStudents(studentsList);
+      setGames(gamesList);
+      setLogs(logsList);
+    } catch (e) {
+      console.error("loadData failed in AdminDashboard:", e);
+    }
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -141,6 +147,23 @@ export const AdminDashboard: React.FC = () => {
     try {
       await LocalDB.saveGame(newGame);
       await loadData();
+
+      // Save game HTML copy to local disk src/game/ folder
+      try {
+        await fetch('/api/save-game', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            title: newGame.title,
+            htmlContent: newGame.htmlContent
+          })
+        });
+      } catch (fileErr) {
+        console.warn("Could not save HTML copy to disk games folder:", fileErr);
+      }
+
       alert(editingGameId ? "Game successfully updated! ✏️" : "Game successfully published to students! 🎉");
       setGeneratedGame(null);
       setEditingGameId(null);
@@ -183,6 +206,19 @@ export const AdminDashboard: React.FC = () => {
     setDifficulty("Easy");
     setAssignedStudentId("");
     setGameInstruction("");
+  };
+
+  const handleTogglePublish = async (game: Game) => {
+    const updated = {
+      ...game,
+      published: !game.published
+    };
+    try {
+      await LocalDB.saveGame(updated);
+      await loadData();
+    } catch (e: any) {
+      alert("Failed to toggle publish status: " + e.message);
+    }
   };
 
   const handleDeleteGame = async (id: string) => {
@@ -683,7 +719,21 @@ export const AdminDashboard: React.FC = () => {
                     }}
                   >
                     <div>
-                      <span style={{ fontWeight: "700", fontSize: "1.05rem" }}>{game.title}</span>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <span style={{ fontWeight: "700", fontSize: "1.05rem" }}>{game.title}</span>
+                        <span
+                          style={{
+                            fontSize: "0.7rem",
+                            backgroundColor: game.published ? "#d1fae5" : "#e2e8f0",
+                            color: game.published ? "#065f46" : "#475569",
+                            padding: "2px 8px",
+                            borderRadius: "6px",
+                            fontWeight: "800"
+                          }}
+                        >
+                          {game.published ? "Published" : "Draft / Hidden"}
+                        </span>
+                      </div>
                       <div style={{ display: "flex", gap: "8px", marginTop: "4px", fontSize: "0.75rem", color: "var(--text-secondary)" }}>
                         <span>Topic: {game.topic}</span>
                         <span>•</span>
@@ -694,6 +744,21 @@ export const AdminDashboard: React.FC = () => {
                     </div>
 
                     <div style={{ display: "flex", gap: "8px" }}>
+                      <button
+                        onClick={() => handleTogglePublish(game)}
+                        className="btn"
+                        style={{
+                          padding: "8px",
+                          backgroundColor: game.published ? "#d1fae5" : "#f1f5f9",
+                          color: game.published ? "#10b981" : "#64748b",
+                          borderRadius: "10px",
+                          boxShadow: "none"
+                        }}
+                        title={game.published ? "Unpublish Activity" : "Publish Activity"}
+                      >
+                        {game.published ? <Eye size={18} /> : <EyeOff size={18} />}
+                      </button>
+
                       <button
                         onClick={() => handleEditGame(game)}
                         className="btn"

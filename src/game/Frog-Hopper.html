@@ -1,0 +1,459 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+    <title>Happy Frog Hopper - 3 Logs Counting</title>
+    <style>
+        body {
+            font-family: 'Comic Sans MS', Arial, sans-serif;
+            margin: 0;
+            background: #e8f5e9;
+            text-align: center;
+            color: #333;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        #screen,
+        #game {
+            display: none;
+            padding: 10px;
+            box-sizing: border-box;
+            width: 100%;
+            max-width: 360px;
+            margin: 0 auto;
+            height: 100vh;
+        }
+
+        #game {
+            display: none;
+            flex-direction: column;
+            justify-content: flex-start;
+            gap: 6px;
+            align-items: center;
+        }
+
+        h1 {
+            color: #2e7d32;
+            font-size: 32px;
+            margin: 10px 0 5px 0;
+        }
+
+        button {
+            padding: 16px 32px;
+            font-size: 22px;
+            font-weight: bold;
+            border-radius: 20px;
+            border: 4px solid #4caf50;
+            background: #81c784;
+            color: white;
+            cursor: pointer;
+            margin: 5px;
+            box-shadow: 0 6px #4caf50;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        button:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px #4caf50;
+        }
+
+        canvas {
+            background: #a5d6a7;
+            border: 6px solid #2e7d32;
+            border-radius: 24px;
+            touch-action: none;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+            display: block;
+            margin: 0 auto;
+        }
+
+        #hud {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 95%;
+            margin: 5px auto;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        #overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+
+        #card {
+            background: #fff;
+            padding: 30px;
+            border-radius: 32px;
+            border: 6px solid #81c784;
+            max-width: 85%;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        #rule-box {
+            background: #fff9c4;
+            border: 4px solid #fbc02d;
+            padding: 12px;
+            border-radius: 20px;
+            font-size: 26px;
+            width: 95%;
+            margin: 0 auto 5px auto;
+            font-weight: bold;
+            box-sizing: border-box;
+            color: #f57f17;
+        }
+
+        /* Dpad styles removed (touch controls active on canvas) */
+    </style>
+</head>
+
+<body>
+
+    <div id="screen" style="padding-top: 20vh;">
+        <h1>🐸 Froggy Counting Adventure!</h1>
+        <p style="font-size: 22px; max-width: 450px; margin: 15px auto; font-weight: bold;">
+            Help Froggy hop across the river!<br><br>
+            🔢 Count the items on the logs from 0 to 9 to cross safely!
+        </p>
+        <button id="start" style="background: #ff7043; border-color: #d84315; box-shadow: 0 6px #d84315;">▶ Play
+            Game!</button>
+    </div>
+
+    <div id="game">
+        <div style="width: 100%;">
+            <div id="rule-box">🎯 Jump only on logs with ... items!</div>
+            <div id="hud">
+                <span id="scoreEl" style="color: #2e7d32;">🐸 Score: 0/3</span>
+                <button id="pause"
+                    style="padding: 6px 16px; font-size: 16px; border-radius: 12px; margin:0;">Pause</button>
+            </div>
+        </div>
+
+        <canvas id="cv"></canvas>
+
+        <!-- Dpad markup removed (direct swipe/tap touch controls active on canvas) -->
+    </div>
+
+    <div id="overlay">
+        <div id="card">
+            <h2 id="title" style="font-size: 32px; margin-top: 0;"></h2>
+            <div id="content" style="font-size: 22px; font-weight: bold;"></div>
+        </div>
+    </div>
+
+    <script>
+        const ROWS = 5, COLS = 8; // 5 rows total: 1 top bank, 3 river lanes, 1 bottom bank
+        const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+        const scoreEl = document.getElementById('scoreEl');
+        const pauseBtn = document.getElementById('pause');
+        const startBtn = document.getElementById('start');
+        const screenDiv = document.getElementById('screen');
+        const gameDiv = document.getElementById('game');
+        const overlay = document.getElementById('overlay');
+        const titleEl = document.getElementById('title');
+        const contentEl = document.getElementById('content');
+        const ruleBox = document.getElementById('rule-box');
+
+        let canvasWidth = 300;
+        let canvasHeight = 186;
+        let cellX = canvasWidth / COLS;
+        let cellY = canvasHeight / ROWS;
+
+        function resizeCanvas() {
+            canvasWidth = Math.floor(innerWidth * 0.95);
+            if (canvasWidth < 200) canvasWidth = 300;
+            if (canvasWidth > 330) canvasWidth = 330;
+            
+            canvasHeight = Math.floor(canvasWidth * 1.25);
+
+            cv.width = canvasWidth;
+            cv.height = canvasHeight;
+
+            cellX = canvasWidth / COLS;
+            cellY = canvasHeight / ROWS;
+        }
+
+        // Run once on load (with fallback values active)
+        resizeCanvas();
+
+        let frog, logs, score, run = false, paused = false;
+        let targetCount = 0;
+        const visualItems = ['⭐', '🍎', '🎈', '🐠', '🍬'];
+        let activeEmoji = '⭐';
+
+        function init() {
+            frog = { x: 4, y: 4 }; // Start at bottom bank (Row 4, center of 8 columns)
+            score = 0;
+            scoreEl.textContent = '🐸 Score: 0/3';
+            pickRandomMathTarget();
+
+            // Exactly 3 lanes of logs (wider width = cellX * 4.2)
+            logs = [
+                { y: 1, speed: canvasWidth * 0.0012, dir: -1, width: cellX * 4.2, x: 40 },
+                { y: 2, speed: canvasWidth * 0.0010, dir: 1, width: cellX * 4.2, x: 260 },
+                { y: 3, speed: canvasWidth * 0.0013, dir: -1, width: cellX * 4.2, x: 120 }
+            ];
+
+            logs.forEach(l => randomizeLogCount(l));
+        }
+
+        function pickRandomMathTarget() {
+            targetCount = Math.floor(Math.random() * 9) + 1;
+            activeEmoji = visualItems[Math.floor(Math.random() * visualItems.length)];
+
+            ruleBox.innerHTML = `🔢 Jump only on logs with <span style="color:#d84315">${targetCount} ${activeEmoji}</span>`;
+        }
+
+        function randomizeLogCount(log) {
+            log.count = Math.floor(Math.random() * 9) + 1;
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
+            // Riverbanks (Row 0 is Top, Row 4 is Bottom)
+            ctx.fillStyle = '#81c784';
+            ctx.fillRect(0, 0, canvasWidth, cellY);
+            ctx.fillRect(0, cellY * 4, canvasWidth, cellY);
+
+            // Blue River across center lanes (Rows 1-3)
+            ctx.fillStyle = '#29b6f6';
+            ctx.fillRect(0, cellY, canvasWidth, cellY * 3);
+
+            // Draw Logs
+            logs.forEach(log => {
+                ctx.fillStyle = '#8d6e63';
+                ctx.fillRect(log.x, log.y * cellY + 3, log.width, cellY - 6);
+
+                ctx.fillStyle = '#5d4037';
+                ctx.fillRect(log.x, log.y * cellY + 3, 10, cellY - 6);
+                ctx.fillRect(log.x + log.width - 10, log.y * cellY + 3, 10, cellY - 6);
+
+                // (Zero count drawing branch removed)
+
+                // Dynamic font sizing: Ensures emojis never overlap even with high numbers
+                const maxFontSize = cellY * 0.45;
+                const spacing = log.width / (log.count + 1);
+                const calculatedFontSize = Math.min(maxFontSize, spacing * 0.9);
+
+                ctx.font = `bold ${calculatedFontSize}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+
+                for (let i = 1; i <= log.count; i++) {
+                    ctx.fillText(activeEmoji, log.x + (spacing * i), log.y * cellY + cellY / 2);
+                }
+            });
+
+            // Draw Player Froggy
+            ctx.fillStyle = '#4caf50';
+            ctx.beginPath();
+            let fx = frog.x * cellX + cellX / 2;
+            let fy = frog.y * cellY + cellY / 2;
+            const frogRadius = cellX * 0.42;
+            ctx.arc(fx, fy, frogRadius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Eyes dynamically scaled to frogRadius
+            ctx.fillStyle = '#fff';
+            ctx.beginPath(); ctx.arc(fx - frogRadius * 0.4, fy - frogRadius * 0.5, frogRadius * 0.4, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(fx + frogRadius * 0.4, fy - frogRadius * 0.5, frogRadius * 0.4, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#000';
+            ctx.beginPath(); ctx.arc(fx - frogRadius * 0.4, fy - frogRadius * 0.5, frogRadius * 0.18, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(fx + frogRadius * 0.4, fy - frogRadius * 0.5, frogRadius * 0.18, 0, Math.PI * 2); ctx.fill();
+        }
+
+        function updatePhysics() {
+            logs.forEach(log => {
+                log.x += log.speed * log.dir;
+
+                if (log.dir === 1 && log.x > canvasWidth) {
+                    log.x = -log.width;
+                    randomizeLogCount(log);
+                } else if (log.dir === -1 && log.x < -log.width) {
+                    log.x = canvasWidth;
+                    randomizeLogCount(log);
+                }
+            });
+
+            if (frog.y >= 1 && frog.y <= 3) {
+                let currentLaneLog = logs[frog.y - 1];
+                let frogPixelX = frog.x * cellX + cellX / 2;
+
+                if (frogPixelX >= currentLaneLog.x && frogPixelX <= currentLaneLog.x + currentLaneLog.width) {
+                    if (currentLaneLog.count !== targetCount) {
+                        triggerSplash(`🔢 Oops! That log has ${currentLaneLog.count}!`);
+                        return;
+                    }
+                    let exactGridX = Math.floor((currentLaneLog.x + currentLaneLog.width / 2) / cellX);
+                    frog.x = Math.max(0, Math.min(COLS - 1, exactGridX));
+                } else {
+                    triggerSplash('💧 Splash! In the water!');
+                }
+            }
+        }
+
+        function triggerSplash(msg) {
+            paused = true;
+            overlay.style.display = 'flex';
+            titleEl.textContent = msg;
+            titleEl.style.color = '#d32f2f';
+
+            contentEl.innerHTML = `<p>Look for the log that has exactly ${targetCount} ${activeEmoji}! You can do it! 🌟</p><button onclick="dismissSplash()">Try Again</button>`;
+        }
+
+        function dismissSplash() {
+            overlay.style.display = 'none';
+            frog = { x: 5, y: 4 };
+            paused = false;
+        }
+
+        function moveFrog(dx, dy) {
+            if (!run || paused) return;
+
+            frog.x = Math.max(0, Math.min(COLS - 1, frog.x + dx));
+            frog.y = Math.max(0, Math.min(ROWS - 1, frog.y + dy));
+
+            if (frog.y === 0) {
+                score++;
+                scoreEl.textContent = '🐸 Score: ' + score + '/3';
+                if (score >= 3) {
+                    endGame();
+                } else {
+                    paused = true;
+                    overlay.style.display = 'flex';
+                    titleEl.textContent = '🎉 Safe Across!';
+                    titleEl.style.color = '#388e3c';
+                    contentEl.innerHTML = '<p>Great counting! Ready for a new number? 🌟</p><button onclick="dismissSplash()">Keep Going</button>';
+                    pickRandomMathTarget();
+                }
+            }
+        }
+
+        function endGame() {
+            run = false;
+            overlay.style.display = 'flex';
+            titleEl.textContent = '🏆 Math Champ! 🎉';
+            titleEl.style.color = '#388e3c';
+            contentEl.innerHTML = '<p>You counted all targets perfectly!</p><button class="large-btn" onclick="restartGame()">Play Again</button>';
+        }
+
+        function restartGame() {
+            overlay.style.display = 'none';
+            init();
+            run = true;
+        }
+
+        function loop() {
+            requestAnimationFrame(loop);
+            if (!run || paused) return;
+            updatePhysics();
+            draw();
+        }
+
+        screenDiv.style.display = 'block';
+        startBtn.addEventListener('click', function () {
+            screenDiv.style.display = 'none';
+            gameDiv.style.display = 'flex';
+            
+            // Re-calculate dimensions when the game container becomes active and visible
+            resizeCanvas();
+            
+            init();
+            run = true;
+        });
+
+        pauseBtn.addEventListener('click', function () {
+            if (!run) return;
+            paused = !paused;
+            pauseBtn.textContent = paused ? 'Play' : 'Pause';
+        });
+
+        // Tap to Hop function (tells Froggy to move in the direction tapped relative to his current position)
+        function handleTapMove(clickX, clickY) {
+            if (!run || paused) return;
+
+            const fx = frog.x * cellX + cellX / 2;
+            const fy = frog.y * cellY + cellY / 2;
+
+            const dx = clickX - fx;
+            const dy = clickY - fy;
+
+            const minTapDistance = 25; // Ignore tiny taps directly on the frog
+            if (Math.abs(dx) > Math.abs(dy)) {
+                if (Math.abs(dx) > minTapDistance) {
+                    if (dx > 0) moveFrog(1, 0);       // Tap Right of Frog
+                    else moveFrog(-1, 0);              // Tap Left of Frog
+                }
+            } else {
+                if (Math.abs(dy) > minTapDistance) {
+                    if (dy > 0) moveFrog(0, 1);       // Tap Down of Frog
+                    else moveFrog(0, -1);              // Tap Up of Frog
+                }
+            }
+        }
+
+        // Direct Canvas Gestures (support both swipe and tap on the river canvas)
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let touchStartTime = 0;
+
+        cv.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            touchStartX = touch.clientX;
+            touchStartY = touch.clientY;
+            touchStartTime = Date.now();
+        }, { passive: false });
+
+        cv.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            const touch = e.changedTouches[0];
+            const dx = touch.clientX - touchStartX;
+            const dy = touch.clientY - touchStartY;
+            const duration = Date.now() - touchStartTime;
+            
+            const swipeThreshold = 30; // Minimum swipe distance in pixels
+            
+            if (Math.abs(dx) > swipeThreshold || Math.abs(dy) > swipeThreshold) {
+                // Swipe detected
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    if (dx > 0) moveFrog(1, 0);  // Swipe Right
+                    else moveFrog(-1, 0);         // Swipe Left
+                } else {
+                    if (dy > 0) moveFrog(0, 1);   // Swipe Down
+                    else moveFrog(0, -1);          // Swipe Up
+                }
+            } else if (duration < 250) {
+                // Short touch with minimal movement is treated as a Tap
+                const rect = cv.getBoundingClientRect();
+                const tx = touch.clientX - rect.left;
+                const ty = touch.clientY - rect.top;
+                handleTapMove(tx, ty);
+            }
+        }, { passive: false });
+
+        // Desktop mouse support for tapping
+        cv.addEventListener('mousedown', (e) => {
+            if ('ontouchstart' in window) return;
+            const rect = cv.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+            handleTapMove(mx, my);
+        });
+
+        requestAnimationFrame(loop);
+    </script>
+</body>
+
+</html>

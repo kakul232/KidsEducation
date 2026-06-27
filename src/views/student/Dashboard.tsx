@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useApp } from "../../context/AppContext";
 import LocalDB from "../../services/db";
-import type { Game } from "../../services/db";
+import type { Game, ActivityLog } from "../../services/db";
 import { Trophy, Play, LogOut } from "lucide-react";
 import { SUBJECTS } from "../../utils/constants";
 import { AvatarIcon } from "../../components/AvatarIcon";
@@ -23,12 +23,8 @@ export const Dashboard: React.FC = () => {
   const [completedGames, setCompletedGames] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    // Fetch published games & logs from DB
-    const fetchGamesAndLogs = async () => {
-      const [allGames, allLogs] = await Promise.all([
-        LocalDB.getGames(),
-        LocalDB.getLogs()
-      ]);
+    // 1. Helper to render games & logs from a given data set
+    const renderGamesAndLogs = (allGames: Game[], allLogs: ActivityLog[]) => {
       const list = allGames.filter(
         g => g.published && (!g.assignedStudentId || g.assignedStudentId === currentStudent?.id)
       );
@@ -61,7 +57,32 @@ export const Dashboard: React.FC = () => {
 
       setGames(sorted);
     };
-    fetchGamesAndLogs();
+
+    // 2. Synchronous Immediate load from local storage cache
+    const cachedGames = LocalDB.getCachedGames();
+    const cachedLogs = LocalDB.getCachedLogs();
+    
+    // If we have cached games, show them immediately! If not, wait for network or local fallback
+    if (cachedGames.length > 0) {
+      renderGamesAndLogs(cachedGames, cachedLogs);
+    }
+
+    // 3. Background Revalidation (check internet & refresh from Firestore)
+    const fetchFreshData = async () => {
+      try {
+        const [freshGames, freshLogs] = await Promise.all([
+          LocalDB.getGames(),
+          LocalDB.getLogs()
+        ]);
+        
+        // Update states silently in the background
+        renderGamesAndLogs(freshGames, freshLogs);
+      } catch (err) {
+        console.warn("Background revalidation failed (offline/error):", err);
+      }
+    };
+    
+    fetchFreshData();
   }, [currentStudent]);
 
   const handleStudentLogOut = () => {
