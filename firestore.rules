@@ -1,0 +1,25 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Scoped rules for security:
+    
+    // 1. Students collection: Allow students to create and update their profiles
+    match /students/{studentId} {
+      allow read, write: if true;
+    }
+    
+    // 2. Games collection: Anyone can read, only authenticated admin accounts can write
+    match /games/{gameId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    
+    // 3. Analytics collection: Anyone can log activity, only authenticated admin accounts can read
+    match /analytics/{logId} {
+      allow create: if true;
+      allow read, update, delete: if request.auth != null;
+    }
+  }
+}

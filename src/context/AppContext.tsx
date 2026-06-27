@@ -65,19 +65,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     initializeAppDatabase();
 
-    // Listen to Firebase Auth state changes
-    const unsubscribeAuth = onAuthStateChanged(firebaseAuth, (user) => {
-      if (user) {
-        setIsAdminLoggedIn(true);
-      } else {
-        setIsAdminLoggedIn(false);
-      }
-    });
-
-    return () => {
-      unsubscribeAuth();
-    };
-
     // Load API Key
     const savedKey = localStorage.getItem("gemini_api_key") || "";
     setGeminiApiKey(savedKey);
@@ -91,6 +78,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         console.error("Failed to load accessibility settings");
       }
     }
+  }, []);
+
+  // Listen to Firebase Auth state changes
+  useEffect(() => {
+    const unsubscribeAuth = onAuthStateChanged(firebaseAuth, (user) => {
+      if (user) {
+        setIsAdminLoggedIn(true);
+      } else {
+        setIsAdminLoggedIn(false);
+      }
+    });
+
+    return () => {
+      unsubscribeAuth();
+    };
   }, []);
 
   // Sync accessibility classes to document body

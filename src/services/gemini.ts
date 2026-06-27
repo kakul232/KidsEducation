@@ -387,7 +387,7 @@ Strict Constraints:
   if (apiKey && apiKey.trim().length > 0) {
     try {
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`,
         {
           method: "POST",
           headers: {
@@ -420,7 +420,14 @@ Strict Constraints:
         throw new Error("Empty response content from Gemini.");
       }
 
-      const parsed = JSON.parse(text.trim());
+      let cleanText = text.trim();
+      if (cleanText.startsWith("```")) {
+        cleanText = cleanText.replace(/^```(json)?/, "");
+        cleanText = cleanText.replace(/```$/, "");
+        cleanText = cleanText.trim();
+      }
+
+      const parsed = JSON.parse(cleanText);
       const htmlContent = parsed.htmlContent;
       const title = parsed.title || `${topic} Game`;
 
@@ -437,8 +444,8 @@ Strict Constraints:
         errors: validation.errors
       };
     } catch (e: any) {
-      console.warn("Gemini Live Generation failed, falling back to dynamic mockup:", e.message);
-      // Fallback is handled below
+      console.error("Gemini Live Generation failed:", e.message);
+      throw new Error(`Gemini AI Generation failed: ${e.message}`);
     }
   }
 

@@ -14,7 +14,8 @@ import {
   CheckCircle,
   AlertTriangle,
   Trash2,
-  Lock
+  Lock,
+  Edit2
 } from "lucide-react";
 
 export const AdminDashboard: React.FC = () => {
@@ -49,6 +50,8 @@ export const AdminDashboard: React.FC = () => {
   const [gameInstruction, setGameInstruction] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedGame, setGeneratedGame] = useState<GeneratedGameResponse | null>(null);
+  const [generationError, setGenerationError] = useState("");
+  const [editingGameId, setEditingGameId] = useState<string | null>(null);
   
   // Custom edit state for draft code
   const [draftCode, setDraftCode] = useState("");
@@ -68,6 +71,9 @@ export const AdminDashboard: React.FC = () => {
   }, [geminiApiKey]);
 
   const loadData = async () => {
+    // Pre-populate defaults under authenticated admin context
+    await LocalDB.prepopulateDefaultGames();
+
     const [studentsList, gamesList, logsList] = await Promise.all([
       LocalDB.getStudents(),
       LocalDB.getGames(),
@@ -101,14 +107,16 @@ export const AdminDashboard: React.FC = () => {
     if (!topic.trim()) return;
     setIsGenerating(true);
     setGeneratedGame(null);
+    setGenerationError("");
     setCodeEditMode(false);
 
     try {
       const result = await generateGame(subject, topic, age, difficulty, geminiApiKey, gameInstruction);
       setGeneratedGame(result);
       setDraftCode(result.htmlContent);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setGenerationError(err.message || "Gemini AI generation failed. Verify API key and network.");
     } finally {
       setIsGenerating(false);
     }
@@ -118,7 +126,7 @@ export const AdminDashboard: React.FC = () => {
     if (!generatedGame) return;
 
     const newGame: Game = {
-      id: "game_" + Math.random().toString(36).substr(2, 9),
+      id: editingGameId || ("game_" + Math.random().toString(36).substr(2, 9)),
       title: generatedGame.title,
       topic: generatedGame.topic,
       subject: "Mathematics",
@@ -132,9 +140,44 @@ export const AdminDashboard: React.FC = () => {
 
     await LocalDB.saveGame(newGame);
     await loadData();
-    alert("Game successfully published to students! 🎉");
+    alert(editingGameId ? "Game successfully updated! ✏️" : "Game successfully published to students! 🎉");
     setGeneratedGame(null);
+    setEditingGameId(null);
     setActiveTab("games");
+  };
+
+  const handleEditGame = (game: Game) => {
+    setTopic(game.topic);
+    setAge(game.age);
+    setDifficulty(game.difficulty);
+    setAssignedStudentId(game.assignedStudentId || "");
+    setDraftCode(game.htmlContent);
+    setGeneratedGame({
+      title: game.title,
+      topic: game.topic,
+      age: game.age,
+      difficulty: game.difficulty,
+      htmlContent: game.htmlContent,
+      promptUsed: "",
+      isValid: true,
+      errors: []
+    });
+    setEditingGameId(game.id);
+    setCodeEditMode(true);
+    setGenerationError("");
+    setActiveTab("studio");
+  };
+
+  const handleCancelEdit = () => {
+    setEditingGameId(null);
+    setGeneratedGame(null);
+    setDraftCode("");
+    setCodeEditMode(false);
+    setTopic("Addition");
+    setAge(5);
+    setDifficulty("Easy");
+    setAssignedStudentId("");
+    setGameInstruction("");
   };
 
   const handleDeleteGame = async (id: string) => {
@@ -376,9 +419,29 @@ export const AdminDashboard: React.FC = () => {
         {activeTab === "studio" && (
           <div className="play-card" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
             <div>
-              <h3 style={{ fontSize: "1.2rem", color: "var(--text-primary)" }}>Generate Interactive Activity</h3>
-              <p style={{ fontSize: "0.9rem", color: "var(--text-secondary)" }}>
-                Uses Gemini to output accessibly structured, dyslexia-friendly arithmetic HTML5 games.
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <h3 style={{ fontSize: "1.2rem", color: "var(--text-primary)" }}>
+                  {editingGameId ? `✏️ Editing Game: ${generatedGame?.title}` : "Generate Interactive Activity"}
+                </h3>
+                {editingGameId && (
+                  <button
+                    onClick={handleCancelEdit}
+                    className="btn"
+                    style={{
+                      padding: "6px 12px",
+                      backgroundColor: "#f1f5f9",
+                      border: "2px solid #cbd5e1",
+                      borderRadius: "10px",
+                      fontSize: "0.8rem",
+                      boxShadow: "none"
+                    }}
+                  >
+                    Cancel Edit
+                  </button>
+                )}
+              </div>
+              <p style={{ fontSize: "0.9rem", color: "var(--text-secondary)", marginTop: "4px" }}>
+                {editingGameId ? "Modify code below or tweak instructions and re-generate." : "Uses Gemini to output accessibly structured, dyslexia-friendly arithmetic HTML5 games."}
               </p>
             </div>
 
@@ -463,6 +526,28 @@ export const AdminDashboard: React.FC = () => {
               {isGenerating ? "Gemini AI Generating Game..." : "Generate AI Game"}
             </button>
 
+            {generationError && (
+              <div
+                style={{
+                  marginTop: "16px",
+                  padding: "14px 18px",
+                  borderRadius: "14px",
+                  backgroundColor: "#fee2e2",
+                  border: "2px solid #ef4444",
+                  color: "#b91c1c",
+                  fontSize: "0.95rem",
+                  fontWeight: "700",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  lineHeight: "1.4"
+                }}
+              >
+                <span>⚠️</span>
+                <span>{generationError}</span>
+              </div>
+            )}
+
             {/* Generated Game Output & Sandbox */}
             {generatedGame && (
               <div
@@ -491,7 +576,7 @@ export const AdminDashboard: React.FC = () => {
                       className="btn btn-success"
                       style={{ padding: "8px 12px", fontSize: "0.8rem", boxShadow: "none" }}
                     >
-                      Publish Game
+                      {editingGameId ? "Save Changes" : "Publish Game"}
                     </button>
                   </div>
                 </div>
@@ -603,20 +688,37 @@ export const AdminDashboard: React.FC = () => {
                       </div>
                     </div>
 
-                    <button
-                      onClick={() => handleDeleteGame(game.id)}
-                      className="btn"
-                      style={{
-                        padding: "8px",
-                        backgroundColor: "#fee2e2",
-                        color: "#ef4444",
-                        borderRadius: "10px",
-                        boxShadow: "none"
-                      }}
-                      title="Delete game"
-                    >
-                      <Trash2 size={18} />
-                    </button>
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <button
+                        onClick={() => handleEditGame(game)}
+                        className="btn"
+                        style={{
+                          padding: "8px",
+                          backgroundColor: "#e0f2fe",
+                          color: "#0284c7",
+                          borderRadius: "10px",
+                          boxShadow: "none"
+                        }}
+                        title="Edit game details & code"
+                      >
+                        <Edit2 size={18} />
+                      </button>
+
+                      <button
+                        onClick={() => handleDeleteGame(game.id)}
+                        className="btn"
+                        style={{
+                          padding: "8px",
+                          backgroundColor: "#fee2e2",
+                          color: "#ef4444",
+                          borderRadius: "10px",
+                          boxShadow: "none"
+                        }}
+                        title="Delete game"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>

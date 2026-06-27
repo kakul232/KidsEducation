@@ -448,16 +448,25 @@ const DEFAULT_GAMES: Game[] = [
 export const LocalDB = {
   async init() {
     try {
+      // Warm up connections
+      await getDocs(collection(db, "games"));
+    } catch (e) {
+      console.warn("Unable to reach Firestore during initialization, relying on offline localCache.");
+    }
+  },
+
+  async prepopulateDefaultGames() {
+    try {
       const snap = await getDocs(collection(db, "games"));
       if (snap.empty) {
-        // Pre-populate Firestore with standard games
+        // Pre-populate Firestore with standard games under authenticated admin session
         for (const game of DEFAULT_GAMES) {
           await setDoc(doc(db, "games", game.id), game);
         }
         console.log("Firestore games collection pre-populated successfully.");
       }
     } catch (e) {
-      console.warn("Unable to reach Firestore during initialization, relying on offline localCache.");
+      console.error("Firestore pre-population failed:", e);
     }
   },
 
