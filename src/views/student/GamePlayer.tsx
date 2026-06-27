@@ -3,22 +3,36 @@ import { useApp } from "../../context/AppContext";
 import Sandbox from "../../components/Sandbox";
 import { ArrowLeft, Star, Volume2, Sparkles, Smile } from "lucide-react";
 import confetti from "canvas-confetti";
+import KidsLoader from "../../components/KidsLoader";
 
 export const GamePlayer: React.FC = () => {
   const { currentPlayingGame, setPlayingGame, addStars, recordActivity, speakText } = useApp();
-  const [startTime] = useState<number>(Date.now());
+  const [startTime, setStartTime] = useState<number>(Date.now());
   const [attempts, setAttempts] = useState(0);
   const [hintsUsed] = useState(0);
   const [isComplete, setIsComplete] = useState(false);
   const [starsAwarded] = useState(5);
+  const [isLoadingGame, setIsLoadingGame] = useState(true);
 
   useEffect(() => {
     if (currentPlayingGame) {
-      speakText(`Let's play ${currentPlayingGame.title}. Answer the question on the screen!`);
+      setIsLoadingGame(true);
+      const timer = setTimeout(() => {
+        setIsLoadingGame(false);
+        setStartTime(Date.now());
+      }, 1500);
+      return () => clearTimeout(timer);
     }
   }, [currentPlayingGame]);
 
+  useEffect(() => {
+    if (currentPlayingGame && !isLoadingGame) {
+      speakText(`Let's play ${currentPlayingGame.title}. Answer the question on the screen!`);
+    }
+  }, [currentPlayingGame, isLoadingGame]);
+
   if (!currentPlayingGame) return null;
+  if (isLoadingGame) return <KidsLoader />;
 
   // Synthesis Audio Feedback Tones
   const playWinSound = () => {

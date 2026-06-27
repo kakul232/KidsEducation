@@ -5,6 +5,7 @@ import type { Game, ActivityLog, Student } from "../../services/db";
 import { generateGame } from "../../services/gemini";
 import type { GeneratedGameResponse } from "../../services/gemini";
 import Sandbox from "../../components/Sandbox";
+import KidsLoader from "../../components/KidsLoader";
 import {
   BarChart3,
   Cpu,
@@ -322,6 +323,7 @@ export const AdminDashboard: React.FC = () => {
   // Render Admin Dashboard layout
   return (
     <div style={{ width: "100%", maxWidth: "800px", margin: "0 auto", padding: "24px" }} className="animate-slide-up">
+      {isGenerating && <KidsLoader />}
       
       {/* Admin Header */}
       <div

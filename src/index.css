@@ -244,3 +244,77 @@ input:focus-visible {
   animation: tagPulse 1.8s infinite ease-in-out;
 }
 
+/* Kids friendly loader animations */
+@keyframes kids-float {
+  0% {
+    transform: translateY(110vh) translateX(0) scale(1) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.8;
+  }
+  90% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(-10vh) translateX(50px) scale(1.2) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+@keyframes kids-bounce {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+  }
+  40% {
+    transform: translateY(-35px) scale(0.95, 1.05);
+  }
+  50% {
+    transform: translateY(-40px) scale(1);
+  }
+  60% {
+    transform: translateY(-35px) scale(1.05, 0.95);
+  }
+  90% {
+    transform: translateY(0) scale(1.1, 0.95);
+  }
+}
+
+@keyframes kids-wiggle {
+  0%, 100% { transform: rotate(-8deg) scale(1); }
+  50% { transform: rotate(8deg) scale(1.05); }
+}
+
+@keyframes kids-spin-slow {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes kids-pulse-scale {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+}
+
+.animate-kids-float {
+  position: absolute;
+  bottom: -100px;
+  animation: kids-float 8s infinite linear;
+}
+
+.animate-kids-bounce {
+  animation: kids-bounce 1.6s infinite ease-in-out;
+}
+
+.animate-kids-wiggle {
+  animation: kids-wiggle 1.2s infinite ease-in-out;
+}
+
+.animate-kids-spin-slow {
+  animation: kids-spin-slow 12s infinite linear;
+}
+
+.animate-kids-pulse-scale {
+  animation: kids-pulse-scale 2s infinite ease-in-out;
+}
+
+
