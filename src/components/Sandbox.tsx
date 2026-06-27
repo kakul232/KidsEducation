@@ -49,13 +49,15 @@ export const Sandbox: React.FC<SandboxProps> = ({ htmlContent, onComplete, onAtt
     <div
       style={{
         width: "100%",
-        height: "100%",
-        minHeight: "380px",
+        maxWidth: "400px",
+        margin: "0 auto",
+        aspectRatio: "3 / 4.5",
         borderRadius: "24px",
         overflow: "hidden",
-        border: "3px solid #e2e8f0",
+        border: "5px solid var(--text-primary)",
         backgroundColor: "#ffffff",
-        position: "relative"
+        position: "relative",
+        boxShadow: "0 12px 24px rgba(0,0,0,0.08)"
       }}
     >
       {blobUrl ? (
@@ -67,7 +69,6 @@ export const Sandbox: React.FC<SandboxProps> = ({ htmlContent, onComplete, onAtt
           style={{
             width: "100%",
             height: "100%",
-            minHeight: "380px",
             border: "none",
             display: "block"
           }}

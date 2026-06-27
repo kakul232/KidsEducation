@@ -370,7 +370,7 @@ Strict Constraints:
   "title": "Short Fun Title with Emoji",
   "htmlContent": "HTML source code string here"
 }
-2. The game must be mobile-first, touch-friendly, highly responsive, with spacious layouts, large text, and bright color contrasts.
+2. The game must be designed specifically for a vertical mobile portrait screen (aspect ratio 9:16 or 3:4). Keep the gameplay layout vertical, avoid wide horizontal grids, and ensure all buttons/interactive areas are vertically stacked or easily accessible within a narrow portrait screen. Use spacious layouts, large text, and bright color contrasts.
 3. Use a dyslexia-friendly design: no countdown timers, no negative text (use positive encouragement like "Great try! Let's try again" instead of "Wrong answer"), only positive reinforcement.
 4. The game MUST report progress using parent.postMessage:
    - When correct answer / completed: parent.postMessage({ type: 'game_complete', success: true, correctCount: 1, incorrectCount: 0 }, '*')
