@@ -1,15 +1,9 @@
 import React, { useState } from "react";
 import { useApp } from "../../context/AppContext";
 import { Sparkles, GraduationCap } from "lucide-react";
-
-// Pre-defined SVG Avatars for children
-const AVATARS = [
-  { id: "bear", label: "🐻 Bear", color: "#fca5a5" },
-  { id: "cat", label: "🐱 Cat", color: "#fde047" },
-  { id: "fox", label: "🦊 Fox", color: "#fdba74" },
-  { id: "frog", label: "🐸 Frog", color: "#86efac" },
-  { id: "panda", label: "🐼 Panda", color: "#e2e8f0" }
-];
+import { AVATARS } from "../../utils/constants";
+import { ChunkyButton } from "../../components/ChunkyButton";
+import { PlayCard } from "../../components/PlayCard";
 
 export const Onboarding: React.FC = () => {
   const { setOnboarding, setView } = useApp();
@@ -29,7 +23,7 @@ export const Onboarding: React.FC = () => {
 
   return (
     <div className="container animate-slide-up" style={{ justifyContent: "center" }}>
-      <div className="play-card" style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+      <PlayCard style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
         
         {/* Title & Welcome */}
         <div style={{ textAlign: "center" }}>
@@ -122,23 +116,23 @@ export const Onboarding: React.FC = () => {
           </div>
 
           {/* Submit */}
-          <button type="submit" className="btn btn-primary" style={{ padding: "18px" }}>
+          <ChunkyButton type="submit" variant="primary" style={{ padding: "18px" }}>
             Start Learning
-          </button>
+          </ChunkyButton>
         </form>
 
         <hr style={{ border: 0, borderTop: "2px solid #e2e8f0" }} />
 
         {/* Link to Admin View */}
-        <button
+        <ChunkyButton
           onClick={() => setView("admin_auth")}
-          className="btn btn-gray"
+          variant="gray"
           style={{ padding: "10px", fontSize: "0.9rem", boxShadow: "none" }}
         >
           <GraduationCap size={18} />
           Teachers / Admin Portal
-        </button>
-      </div>
+        </ChunkyButton>
+      </PlayCard>
     </div>
   );
 };
