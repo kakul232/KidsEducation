@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no'>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 15px;
+            height: 100%;
+            box-sizing: border-box;
+            font-family: 'Arial', sans-serif;
+            background: #fff5e6;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            touch-action: none;
+        }
+        #header {
+            font-size: 2.2rem;
+            text-align: center;
+            color: #ff4757;
+            padding: 5px;
+            font-weight: bold;
+        }
+        #accessibility-text {
+            font-size: 2.5rem;
+            text-align: center;
+            color: #2ed573;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        #emoji-display {
+            flex: 1;
+            display: flex;
+            flex-wrap: wrap;
+            align-content: center;
+            justify-content: center;
+            gap: 15px;
+            font-size: 4rem; /* Adjusted slightly so 20 emojis fit nicely on screen */
+            padding: 15px;
+            background: white;
+            border-radius: 25px;
+            margin-bottom: 20px;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.05);
+            overflow-y: auto;
+        }
+        #game-board {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding-bottom: 10px;
+            height: 35%;
+        }
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.95);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 3.5rem;
+            font-weight: bold;
+            z-index: 10;
+            text-align: center;
+            padding: 20px;
+        }
+        .choice {
+            background: #ffa500;
+            color: white;
+            border: 6px solid #ff7f50;
+            border-radius: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 5rem;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 12px #d47a00;
+            user-select: none;
+            width: 80%;
+            height: 100%;
+        }
+        .choice:active {
+            transform: scale(0.92);
+            box-shadow: 0 4px #d47a00;
+        }
+    </style>
+</head>
+<body>
+
+    <div id='header'>Count them!</div>
+    <div id='accessibility-text'></div>
+    
+    <div id='emoji-display'></div>
+    <div id='game-board'></div>
+    
+    <div id='overlay'></div>
+
+<script>
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function playTone(freq, type) {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.6);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.6);
+}
+
+let currentTarget = 1; 
+const maxNumber = 20; 
+
+const emojis = ['🍎', '🎈', '🌟', '🧸', '🐶', '🐱', '🦁', '🐰', '🐸', '🐮', '🦋', '🎨', '🚀', '🛸', '🌈', '☀️', '🍕', '🍦', '🍭', '🍩'];
+
+// Added full vocabulary array up to twenty
+const numberWords = [
+    "Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten",
+    "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen", "Twenty"
+];
+
+function nextRound() {
+    // Loop back to 1 after finishing the game
+    if (currentTarget > maxNumber) {
+        currentTarget = 1;
+    }
+    
+    const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
+    
+    document.getElementById('accessibility-text').innerText = `"${numberWords[currentTarget]}"`;
+    
+    const displayArea = document.getElementById('emoji-display');
+    displayArea.innerHTML = '';
+    for (let i = 0; i < currentTarget; i++) {
+        const span = document.createElement('span');
+        span.innerText = randomEmoji;
+        displayArea.appendChild(span);
+    }
+    
+    const board = document.getElementById('game-board');
+    board.innerHTML = '';
+    
+    const btn = document.createElement('div');
+    btn.className = 'choice';
+    btn.innerText = currentTarget;
+    
+    const clickHandler = () => check(currentTarget);
+    btn.ontouchstart = (e) => { e.preventDefault(); clickHandler(); };
+    btn.onclick = clickHandler;
+    
+    board.appendChild(btn);
+}
+
+function check(val) {
+    const overlay = document.getElementById('overlay');
+    if (val === currentTarget) {
+        playTone(550, 'sine');
+        overlay.style.display = 'flex';
+        
+        // Check if the final level (20) was passed
+        if (currentTarget === maxNumber) {
+            overlay.innerHTML = `🎉 You Finished! 🎉<br><span style="font-size:2.5rem; color:#ff4757;">Awesome Counting!</span>`;
+            
+            parent.postMessage({type: 'game_action', success: true, question: 'Count ' + currentTarget, answer: val}, '*');
+            parent.postMessage({type: 'game_complete', success: true, correctCount: 1, incorrectCount: 0}, '*');
+            
+            currentTarget++; // This makes it go past maxNumber to trigger the reset in nextRound
+            
+            setTimeout(() => {
+                overlay.style.display = 'none';
+                nextRound();
+            }, 2500); // Give slightly more time for the final celebration screen
+        } else {
+            overlay.innerHTML = `Great Job! ❤️<br><span style="font-size:5rem;">${currentTarget}</span>`;
+            
+            parent.postMessage({type: 'game_action', success: true, question: 'Count ' + currentTarget, answer: val}, '*');
+            
+            currentTarget++;
+            
+            setTimeout(() => {
+                overlay.style.display = 'none';
+                nextRound();
+            }, 1500);
+        }
+    }
+}
+
+nextRound();
+</script>
+</body>
+</html>

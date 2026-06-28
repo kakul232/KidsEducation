@@ -1196,37 +1196,246 @@ export const AdminDashboard: React.FC = () => {
                       <label htmlFor="html-editor-textarea" style={{ fontSize: "0.85rem", fontWeight: "700" }}>
                         HTML/CSS/JS Source Code
                       </label>
-                      <button
-                        onClick={handleClearHtml}
-                        className="btn"
-                        style={{
-                          padding: "4px 10px",
-                          backgroundColor: "#fee2e2",
-                          border: "1.5px solid #fecaca",
-                          color: "#b91c1c",
-                          borderRadius: "8px",
-                          fontSize: "0.75rem",
-                          boxShadow: "none"
-                        }}
-                      >
-                        🗑️ Clear Code
-                      </button>
+                      <div style={{ display: "flex", gap: "8px" }}>
+                        <button
+                          onClick={() => {
+                            try {
+                              const formatJS = (code: string, baseIndent: number): string => {
+                                const lines = code.split('\n');
+                                const formatted: string[] = [];
+                                let indent = baseIndent;
+                                
+                                lines.forEach(line => {
+                                  const trimmed = line.trim();
+                                  if (!trimmed) return;
+                                  
+                                  // Decrease indent for closing braces/brackets
+                                  if (trimmed.startsWith('}') || trimmed.startsWith(']') || trimmed.startsWith(')')) {
+                                    indent = Math.max(baseIndent, indent - 1);
+                                  }
+                                  
+                                  formatted.push('  '.repeat(indent) + trimmed);
+                                  
+                                  // Increase indent after opening braces/brackets
+                                  if (trimmed.endsWith('{') || trimmed.endsWith('[') || trimmed.endsWith('(')) {
+                                    indent++;
+                                  }
+                                  
+                                  // Decrease indent after closing on same line
+                                  if ((trimmed.endsWith('}') || trimmed.endsWith(']') || trimmed.endsWith(')')) &&
+                                      (trimmed.includes('{') || trimmed.includes('[') || trimmed.includes('('))) {
+                                    // Do nothing, already handled
+                                  } else if (trimmed.endsWith('}') || trimmed.endsWith(']') || trimmed.endsWith(')')) {
+                                    indent = Math.max(baseIndent, indent - 1);
+                                  }
+                                });
+                                
+                                return formatted.join('\n');
+                              };
+                              
+                              const formatCSS = (code: string, baseIndent: number): string => {
+                                const lines = code.split('\n');
+                                const formatted: string[] = [];
+                                let indent = baseIndent;
+                                
+                                lines.forEach(line => {
+                                  const trimmed = line.trim();
+                                  if (!trimmed) return;
+                                  
+                                  if (trimmed === '}') {
+                                    indent = Math.max(baseIndent, indent - 1);
+                                  }
+                                  
+                                  formatted.push('  '.repeat(indent) + trimmed);
+                                  
+                                  if (trimmed.endsWith('{')) {
+                                    indent++;
+                                  } else if (trimmed === '}') {
+                                    // Already decreased above
+                                  }
+                                });
+                                
+                                return formatted.join('\n');
+                              };
+                              
+                              // Main formatter
+                              let result = '';
+                              let htmlIndent = 0;
+                              const parts = draftCode.split(/(<script[^>]*>|<\/script>|<style[^>]*>|<\/style>)/gi);
+                              let inScript = false;
+                              let inStyle = false;
+                              let scriptContent = '';
+                              let styleContent = '';
+                              
+                              parts.forEach(part => {
+                                if (part.match(/<script[^>]*>/i)) {
+                                  result += '  '.repeat(htmlIndent) + part + '\n';
+                                  inScript = true;
+                                  htmlIndent++;
+                                  scriptContent = '';
+                                } else if (part.match(/<\/script>/i)) {
+                                  if (scriptContent.trim()) {
+                                    result += formatJS(scriptContent, htmlIndent) + '\n';
+                                  }
+                                  htmlIndent = Math.max(0, htmlIndent - 1);
+                                  result += '  '.repeat(htmlIndent) + part + '\n';
+                                  inScript = false;
+                                } else if (part.match(/<style[^>]*>/i)) {
+                                  result += '  '.repeat(htmlIndent) + part + '\n';
+                                  inStyle = true;
+                                  htmlIndent++;
+                                  styleContent = '';
+                                } else if (part.match(/<\/style>/i)) {
+                                  if (styleContent.trim()) {
+                                    result += formatCSS(styleContent, htmlIndent) + '\n';
+                                  }
+                                  htmlIndent = Math.max(0, htmlIndent - 1);
+                                  result += '  '.repeat(htmlIndent) + part + '\n';
+                                  inStyle = false;
+                                } else if (inScript) {
+                                  scriptContent += part;
+                                } else if (inStyle) {
+                                  styleContent += part;
+                                } else {
+                                  // Format HTML
+                                  const tags = part.split(/(<[^>]+>)/g).filter(s => s.trim());
+                                  tags.forEach(tag => {
+                                    if (tag.startsWith('</')) {
+                                      htmlIndent = Math.max(0, htmlIndent - 1);
+                                      result += '  '.repeat(htmlIndent) + tag + '\n';
+                                    } else if (tag.startsWith('<') && !tag.endsWith('/>') &&
+                                               !tag.match(/<(br|hr|img|input|meta|link|area|base|col|embed|param|source|track|wbr)/i)) {
+                                      result += '  '.repeat(htmlIndent) + tag + '\n';
+                                      htmlIndent++;
+                                    } else if (tag.startsWith('<')) {
+                                      result += '  '.repeat(htmlIndent) + tag + '\n';
+                                    } else if (tag.trim()) {
+                                      result += '  '.repeat(htmlIndent) + tag.trim() + '\n';
+                                    }
+                                  });
+                                }
+                              });
+                              
+                              setDraftCode(result.trim());
+                            } catch (err) {
+                              alert('Could not format document. Please check for syntax errors.');
+                            }
+                          }}
+                          className="btn"
+                          style={{
+                            padding: "4px 10px",
+                            backgroundColor: "#dbeafe",
+                            border: "1.5px solid #bfdbfe",
+                            color: "#1e40af",
+                            borderRadius: "8px",
+                            fontSize: "0.75rem",
+                            boxShadow: "none"
+                          }}
+                        >
+                          ✨ Format Document
+                        </button>
+                        <button
+                          onClick={handleClearHtml}
+                          className="btn"
+                          style={{
+                            padding: "4px 10px",
+                            backgroundColor: "#fee2e2",
+                            border: "1.5px solid #fecaca",
+                            color: "#b91c1c",
+                            borderRadius: "8px",
+                            fontSize: "0.75rem",
+                            boxShadow: "none"
+                          }}
+                        >
+                          🗑️ Clear All
+                        </button>
+                      </div>
                     </div>
-                    <textarea
-                      id="html-editor-textarea"
-                      value={draftCode}
-                      onChange={e => setDraftCode(e.target.value)}
-                      style={{
-                        width: "100%",
-                        height: "280px",
+                    <div style={{
+                      width: "100%",
+                      height: "280px",
+                      borderRadius: "10px",
+                      border: "2px solid #cbd5e1",
+                      backgroundColor: "#1e293b",
+                      overflow: "hidden",
+                      position: "relative"
+                    }}>
+                      <div style={{
+                        display: "flex",
+                        height: "100%"
+                      }}>
+                        {/* Line Numbers */}
+                        <div style={{
+                          backgroundColor: "#0f172a",
+                          color: "#64748b",
+                          padding: "12px 8px",
+                          fontFamily: "monospace",
+                          fontSize: "0.85rem",
+                          lineHeight: "1.5",
+                          textAlign: "right",
+                          userSelect: "none",
+                          minWidth: "40px",
+                          borderRight: "1px solid #334155"
+                        }}>
+                          {draftCode.split('\n').map((_, i) => (
+                            <div key={i}>{i + 1}</div>
+                          ))}
+                        </div>
+                        {/* Code Editor */}
+                        <textarea
+                          id="html-editor-textarea"
+                          value={draftCode}
+                          onChange={e => setDraftCode(e.target.value)}
+                          spellCheck={false}
+                          style={{
+                            flex: 1,
+                            height: "100%",
+                            fontFamily: "'Consolas', 'Monaco', 'Courier New', monospace",
+                            fontSize: "0.85rem",
+                            padding: "12px",
+                            border: "none",
+                            backgroundColor: "#1e293b",
+                            color: "#e2e8f0",
+                            resize: "none",
+                            outline: "none",
+                            lineHeight: "1.5",
+                            tabSize: 2,
+                            whiteSpace: "pre",
+                            overflowWrap: "normal",
+                            overflowX: "auto"
+                          }}
+                          onKeyDown={(e) => {
+                            // Tab key support
+                            if (e.key === 'Tab') {
+                              e.preventDefault();
+                              const start = e.currentTarget.selectionStart;
+                              const end = e.currentTarget.selectionEnd;
+                              const newValue = draftCode.substring(0, start) + '  ' + draftCode.substring(end);
+                              setDraftCode(newValue);
+                              setTimeout(() => {
+                                e.currentTarget.selectionStart = e.currentTarget.selectionEnd = start + 2;
+                              }, 0);
+                            }
+                          }}
+                        />
+                      </div>
+                      {/* Editor Info Bar */}
+                      <div style={{
+                        position: "absolute",
+                        bottom: 0,
+                        right: 0,
+                        backgroundColor: "#0f172a",
+                        color: "#64748b",
+                        padding: "4px 12px",
+                        fontSize: "0.7rem",
                         fontFamily: "monospace",
-                        fontSize: "0.85rem",
-                        padding: "12px",
-                        borderRadius: "10px",
-                        border: "2px solid #cbd5e1",
-                        backgroundColor: "#f8fafc"
-                      }}
-                    />
+                        borderTopLeftRadius: "6px",
+                        borderLeft: "1px solid #334155",
+                        borderTop: "1px solid #334155"
+                      }}>
+                        Lines: {draftCode.split('\n').length} | Chars: {draftCode.length}
+                      </div>
+                    </div>
                   </div>
                 ) : (
                   <div>

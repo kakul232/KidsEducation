@@ -26,25 +26,37 @@ export function validateGameCode(htmlContent: string): ValidationResult {
   });
 
   // Strict check on postMessage and parent access
-  // We allow `parent.postMessage({ type: 'game_complete'` and `parent.postMessage({ type: 'game_attempt'` but block other parent / postMessage calls
-  
-  // Find any occurrence of parent or postMessage
-  const parentMatches = htmlContent.match(/parent/g) || [];
-  const postMessageMatches = htmlContent.match(/postMessage/g) || [];
+  // We extract JS script contents and inline events to avoid false positives on HTML text content
+  let jsCode = "";
+  const scriptRegex = /<script\b[^>]*>([\s\S]*?)<\/script>/gi;
+  let scriptMatch;
+  while ((scriptMatch = scriptRegex.exec(htmlContent)) !== null) {
+    jsCode += scriptMatch[1] + "\n";
+  }
 
-  // We check if they are part of the safe allowed format
-  const safeCompletePattern = /parent\.postMessage\(\s*\{\s*type:\s*['"]game_complete['"]/g;
-  const safeAttemptPattern = /parent\.postMessage\(\s*\{\s*type:\s*['"]game_attempt['"]/g;
+  const inlineAttrRegex = /\bon[a-z]+\s*=\s*(['"])([\s\S]*?)\1/gi;
+  let inlineMatch;
+  while ((inlineMatch = inlineAttrRegex.exec(htmlContent)) !== null) {
+    jsCode += inlineMatch[2] + "\n";
+  }
 
-  const safeCompleteMatches = htmlContent.match(safeCompletePattern) || [];
-  const safeAttemptMatches = htmlContent.match(safeAttemptPattern) || [];
-  const totalSafeMatches = safeCompleteMatches.length + safeAttemptMatches.length;
+  // Strip single-line and multi-line comments
+  let cleanCode = jsCode.replace(/\/\/.*/g, "");
+  cleanCode = cleanCode.replace(/\/\*[\s\S]*?\*\//g, "");
 
-  if (parentMatches.length > totalSafeMatches) {
+  // Match postMessage references in executable JS
+  const parentMatches = cleanCode.match(/\bparent\b/g) || [];
+  const postMessageMatches = cleanCode.match(/\bpostMessage\b/g) || [];
+
+  // Match flexible parent.postMessage calls with type game_complete, game_attempt, or game_action
+  const safePostMessagePattern = /(?:parent|window\.parent)\.postMessage\(\s*\{\s*[\s\S]*?['"]?type['"]?\s*:\s*['"](game_complete|game_attempt|game_action)['"][\s\S]*?\}\s*,\s*['"]\*['"]\s*\)/g;
+  const safeMatches = cleanCode.match(safePostMessagePattern) || [];
+
+  if (parentMatches.length > safeMatches.length) {
     errors.push("Forbidden parent window access detected. Only 'parent.postMessage' for game completion and attempts is permitted.");
   }
 
-  if (postMessageMatches.length > totalSafeMatches) {
+  if (postMessageMatches.length > safeMatches.length) {
     errors.push("Forbidden postMessage usage. Only sending 'game_complete' or 'game_attempt' to the parent is permitted.");
   }
 
