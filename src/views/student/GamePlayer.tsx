@@ -138,18 +138,40 @@ export const GamePlayer: React.FC = () => {
     // Reward stars
     addStars(reward);
 
+    // If attemptsHistory is empty, synthesize fallbacks based on correct/incorrect counts
+    let finalAttemptsHistory = [...attemptsHistory];
+    if (finalAttemptsHistory.length === 0) {
+      const startMs = startTime;
+      for (let i = 0; i < incorrectCount; i++) {
+        finalAttemptsHistory.push({
+          question: `Challenge Task ${i + 1}`,
+          answer: "Incorrect attempt",
+          success: false,
+          timestamp: new Date(startMs + i * 1000).toISOString()
+        });
+      }
+      for (let i = 0; i < correctCount; i++) {
+        finalAttemptsHistory.push({
+          question: `Challenge Task ${incorrectCount + i + 1}`,
+          answer: "Correct answer",
+          success: true,
+          timestamp: new Date(startMs + (incorrectCount + i) * 1000).toISOString()
+        });
+      }
+    }
+
     // Save analytics log
     recordActivity({
       startTime: new Date(startTime).toISOString(),
       finishTime: new Date(endTime).toISOString(),
       duration,
-      attempts: attemptsHistory.length || attempts + 1,
+      attempts: finalAttemptsHistory.length || attempts || 1,
       correctAnswers: correctCount,
       incorrectAnswers: incorrectCount,
       hintsUsed,
       completionRate: 100,
-      rewardEarned: `⭐ ${starsAwarded} Stars`,
-      attemptsHistory
+      rewardEarned: `⭐ ${reward} Stars`,
+      attemptsHistory: finalAttemptsHistory
     });
 
     // Run celebration
@@ -160,7 +182,7 @@ export const GamePlayer: React.FC = () => {
       origin: { y: 0.6 }
     });
 
-    speakText(`Splendid job! You finished the game and earned ${starsAwarded} stars!`);
+    speakText(`Splendid job! You finished the game and earned ${reward} stars!`);
   };
 
   const handleReadGameTitle = () => {
@@ -170,12 +192,13 @@ export const GamePlayer: React.FC = () => {
   return (
     <div className="container animate-slide-up" style={{ minHeight: "100vh", padding: "12px 8px 30px" }}>
       
-      {/* Header controls */}
       <div
         style={{
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
+          flexWrap: "wrap",
+          gap: "8px",
           marginBottom: "10px"
         }}
       >

@@ -535,6 +535,27 @@ input:focus-visible {
   }
 }
 
+@media (max-width: 480px) {
+  .container {
+    padding: 12px;
+  }
+}
+
+.admin-mobile-cards {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .admin-table-wrapper {
+    display: none !important;
+  }
+  .admin-mobile-cards {
+    display: flex !important;
+    flex-direction: column;
+    gap: 12px;
+  }
+}
+
 
 
 

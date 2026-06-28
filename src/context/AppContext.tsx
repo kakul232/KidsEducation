@@ -3,7 +3,7 @@ import LocalDB from "../services/db";
 import type { Student, Game, ActivityLog } from "../services/db";
 import { auth as firebaseAuth, db } from "../services/firebase";
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, collection, query, where, onSnapshot } from "firebase/firestore";
 import { getClientDetails } from "../utils/device";
 
 export type ViewState = "onboarding" | "dashboard" | "game_player" | "admin_auth" | "admin_dashboard";
@@ -35,6 +35,9 @@ interface AppContextType {
   installPrompt: any;
   triggerInstall: () => Promise<void>;
   isAuthLoading: boolean;
+  notiPermission: NotificationPermission;
+  requestNotiPermission: () => Promise<void>;
+  sendPushNotification: (title: string, message: string) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -79,6 +82,71 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+
+  const [notiPermission, setNotiPermission] = useState<NotificationPermission>(
+    typeof window !== "undefined" && "Notification" in window ? Notification.permission : "default"
+  );
+
+  const requestNotiPermission = async () => {
+    if (typeof window === "undefined" || !("Notification" in window)) return;
+    try {
+      const permission = await Notification.requestPermission();
+      setNotiPermission(permission);
+      if (permission === "granted") {
+        new Notification("Notifications Turned On! 🔔", {
+          body: "You will now get alerts for new games and updates!",
+          icon: "/favicon.svg"
+        });
+      }
+    } catch (err) {
+      console.error("Failed to request notification permission:", err);
+    }
+  };
+
+  const sendPushNotification = async (title: string, message: string) => {
+    try {
+      const docRef = doc(collection(db, "notifications"));
+      await setDoc(docRef, {
+        title,
+        message,
+        createdAt: new Date().toISOString()
+      });
+    } catch (err) {
+      console.error("Failed to write push notification document:", err);
+    }
+  };
+
+  // Global real-time listener for database push notifications
+  useEffect(() => {
+    const appStartTime = new Date().toISOString();
+    const q = query(
+      collection(db, "notifications"),
+      where("createdAt", ">", appStartTime)
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === "added") {
+          const data = change.doc.data();
+          
+          // 1. Show browser PWA notification if granted
+          if (Notification.permission === "granted") {
+            new Notification(data.title || "New Game Alert! 🎮", {
+              body: data.message || "A new game is ready for you!",
+              icon: "/favicon.svg"
+            });
+          }
+          // 2. TTS Voice Assistance reading
+          speakText(`Attention: ${data.title}. ${data.message}`);
+          
+          // 3. Playful kids-friendly JS alert box
+          alert(`📢 ${data.title}\n${data.message}`);
+        }
+      });
+    }, (err) => {
+      console.warn("Firestore snapshot subscription failed:", err);
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Initialize DB and load active student if exists
   useEffect(() => {
@@ -391,7 +459,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         recordActivity,
         installPrompt,
         triggerInstall,
-        isAuthLoading
+        isAuthLoading,
+        notiPermission,
+        requestNotiPermission,
+        sendPushNotification
       }}
     >
       {children}

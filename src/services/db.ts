@@ -529,6 +529,19 @@ export const LocalDB = {
     }
   },
 
+  async deleteStudent(id: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, "students", id));
+      // Update cache
+      const cached = this.getCachedStudents();
+      const filtered = cached.filter(s => s.id !== id);
+      this.setCachedStudents(filtered);
+    } catch (e) {
+      console.error("Firestore deleteStudent failed", e);
+      throw e;
+    }
+  },
+
   // Games CRUD
   async getGames(): Promise<Game[]> {
     const isOffline = !navigator.onLine;

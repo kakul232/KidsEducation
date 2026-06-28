@@ -51,7 +51,8 @@ export const AdminDashboard: React.FC = () => {
     logOutAdmin,
     geminiApiKey,
     saveApiKey,
-    setView
+    setView,
+    sendPushNotification
   } = useApp();
 
   // Auth States
@@ -66,6 +67,7 @@ export const AdminDashboard: React.FC = () => {
   const [students, setStudents] = useState<Student[]>([]);
   const [games, setGames] = useState<Game[]>([]);
   const [logs, setLogs] = useState<ActivityLog[]>([]);
+  const [visibleLogCount, setVisibleLogCount] = useState(20);
 
   // AI Studio Generation Form States
   const [subject] = useState("Mathematics");
@@ -89,9 +91,28 @@ export const AdminDashboard: React.FC = () => {
   const [draftCode, setDraftCode] = useState("");
   const [codeEditMode, setCodeEditMode] = useState(false);
   const [selectedDetailLog, setSelectedDetailLog] = useState<ActivityLog | null>(null);
+  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
 
   // Settings
   const [apiKeyInput, setApiKeyInput] = useState(geminiApiKey);
+  const [manualNotiTitle, setManualNotiTitle] = useState("");
+  const [manualNotiMessage, setManualNotiMessage] = useState("");
+
+  const handleSendManualNotification = async () => {
+    if (!manualNotiTitle.trim() || !manualNotiMessage.trim()) {
+      alert("Please fill in both the Alert Title and Alert Message!");
+      return;
+    }
+    try {
+      await sendPushNotification(manualNotiTitle.trim(), manualNotiMessage.trim());
+      alert("Push notification broadcasted successfully! 🚀");
+      setManualNotiTitle("");
+      setManualNotiMessage("");
+    } catch (err) {
+      console.error("Failed to send manual notification broadcast:", err);
+      alert("Failed to send manual notification broadcast.");
+    }
+  };
 
   useEffect(() => {
     if (isAdminLoggedIn) {
@@ -104,6 +125,30 @@ export const AdminDashboard: React.FC = () => {
     setApiKeyInput(geminiApiKey);
   }, [geminiApiKey]);
 
+  // Infinite scroll paging triggers for analytics tab
+  useEffect(() => {
+    if (activeTab !== "analytics") return;
+
+    const handleScroll = () => {
+      // Check if user scrolled near the bottom of the window
+      if (
+        window.innerHeight + document.documentElement.scrollTop >=
+        document.documentElement.offsetHeight - 120
+      ) {
+        setVisibleLogCount(prev => prev + 20);
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === "analytics") {
+      setVisibleLogCount(20);
+    }
+  }, [activeTab]);
+
   const loadData = async () => {
     setIsDataLoading(true);
     // Pre-populate defaults under authenticated admin context
@@ -115,9 +160,21 @@ export const AdminDashboard: React.FC = () => {
         LocalDB.getGames(),
         LocalDB.getLogs()
       ]);
-      setStudents(studentsList);
-      setGames(gamesList);
-      setLogs(logsList);
+      
+      // Sort lists by updatedBy / Recent (newest first)
+      const sortedStudents = [...studentsList].sort(
+        (a, b) => new Date(b.lastActive || 0).getTime() - new Date(a.lastActive || 0).getTime()
+      );
+      const sortedGames = [...gamesList].sort(
+        (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+      );
+      const sortedLogs = [...logsList].sort(
+        (a, b) => new Date(b.finishTime || b.startTime || 0).getTime() - new Date(a.finishTime || a.startTime || 0).getTime()
+      );
+
+      setStudents(sortedStudents);
+      setGames(sortedGames);
+      setLogs(sortedLogs);
     } catch (e) {
       console.error("loadData failed in AdminDashboard:", e);
     } finally {
@@ -136,7 +193,8 @@ export const AdminDashboard: React.FC = () => {
 
       const updatedStudent = {
         ...student,
-        validUntil: newExp
+        validUntil: newExp,
+        lastActive: new Date().toISOString()
       };
 
       await LocalDB.saveStudent(updatedStudent);
@@ -145,6 +203,28 @@ export const AdminDashboard: React.FC = () => {
     } catch (e) {
       console.error("Failed to extend validity:", e);
       alert("Error extending student validity.");
+    }
+  };
+
+  const handleToggleSelectStudent = (id: string) => {
+    setSelectedStudentIds(prev => 
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleBulkDeleteStudents = async () => {
+    if (selectedStudentIds.length === 0) return;
+    const count = selectedStudentIds.length;
+    if (confirm(`Are you sure you want to delete the selected ${count} student(s)? This will permanently remove their profile data.`)) {
+      try {
+        await Promise.all(selectedStudentIds.map(id => LocalDB.deleteStudent(id)));
+        alert(`Successfully deleted ${count} student(s)!`);
+        setSelectedStudentIds([]);
+        loadData();
+      } catch (err: any) {
+        console.error("Bulk deletion failed:", err);
+        alert("Failed to delete selected students: " + err.message);
+      }
     }
   };
 
@@ -270,6 +350,16 @@ export const AdminDashboard: React.FC = () => {
       await LocalDB.saveGame(newGame);
       await loadData();
 
+      // Automatically broadcast notification to students
+      try {
+        await sendPushNotification(
+          "New Game Published! 🎮",
+          `A new math activity "${newGame.title}" is ready! Let's play and earn stars! ✨`
+        );
+      } catch (notiErr) {
+        console.warn("Could not trigger publish notification:", notiErr);
+      }
+
       // Save game HTML copy to local disk src/game/ folder
       try {
         await fetch('/api/save-game', {
@@ -338,6 +428,17 @@ export const AdminDashboard: React.FC = () => {
     try {
       await LocalDB.saveGame(updated);
       await loadData();
+
+      if (updated.published) {
+        try {
+          await sendPushNotification(
+            "New Game Published! 🎮",
+            `A new math activity "${updated.title}" is ready! Let's play and earn stars! ✨`
+          );
+        } catch (notiErr) {
+          console.warn("Could not trigger toggle publish notification:", notiErr);
+        }
+      }
     } catch (e: any) {
       alert("Failed to toggle publish status: " + e.message);
     }
@@ -543,7 +644,28 @@ export const AdminDashboard: React.FC = () => {
 
             {/* Students List */}
             <div className="play-card">
-              <h3 style={{ fontSize: "1.1rem", marginBottom: "12px" }}>Active Students</h3>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
+                <h3 style={{ fontSize: "1.1rem", margin: 0 }}>Active Students ({students.length})</h3>
+                {selectedStudentIds.length > 0 && (
+                  <button
+                    onClick={handleBulkDeleteStudents}
+                    className="btn"
+                    style={{
+                      padding: "8px 14px",
+                      backgroundColor: "#fee2e2",
+                      border: "1.5px solid #ef4444",
+                      color: "#b91c1c",
+                      borderRadius: "10px",
+                      fontSize: "0.8rem",
+                      fontWeight: "800",
+                      boxShadow: "none",
+                      cursor: "pointer"
+                    }}
+                  >
+                    🗑️ Delete Selected ({selectedStudentIds.length})
+                  </button>
+                )}
+              </div>
               {students.length === 0 ? (
                 <p style={{ color: "var(--text-secondary)", fontSize: "0.95rem" }}>No students registered yet.</p>
               ) : (
@@ -560,17 +682,32 @@ export const AdminDashboard: React.FC = () => {
                           padding: "12px 16px",
                           backgroundColor: "var(--bg-primary)",
                           borderRadius: "12px",
-                          border: "1px solid #cbd5e1"
+                          border: "1.5px solid",
+                          borderColor: selectedStudentIds.includes(std.id) ? "var(--accent-primary)" : "#cbd5e1"
                         }}
                       >
-                        <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
-                          <span style={{ fontWeight: "700", fontSize: "1rem" }}>{std.name}</span>
-                          <span style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>
-                            Age: {std.age || "N/A"} | Class: {std.class || "N/A"} | Phone: {std.phone || "N/A"}
-                          </span>
-                          <span style={{ fontSize: "0.8rem", color: isExpired ? "#ef4444" : "#10b981", fontWeight: "800" }}>
-                            {isExpired ? "⏰ Expired" : "✓ Active"} (Expires: {std.validUntil ? new Date(std.validUntil).toLocaleDateString() : "Never"})
-                          </span>
+                        <div style={{ display: "flex", alignItems: "center", gap: "12px", flex: 1 }}>
+                          <input
+                            type="checkbox"
+                            checked={selectedStudentIds.includes(std.id)}
+                            onChange={() => handleToggleSelectStudent(std.id)}
+                            style={{
+                              width: "18px",
+                              height: "18px",
+                              borderRadius: "4px",
+                              accentColor: "var(--accent-primary)",
+                              cursor: "pointer"
+                            }}
+                          />
+                          <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+                            <span style={{ fontWeight: "700", fontSize: "1rem" }}>{std.name}</span>
+                            <span style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>
+                              Age: {std.age || "N/A"} | Class: {std.class || "N/A"} | Phone: {std.phone || "N/A"}
+                            </span>
+                            <span style={{ fontSize: "0.8rem", color: isExpired ? "#ef4444" : "#10b981", fontWeight: "800" }}>
+                              {isExpired ? "⏰ Expired" : "✓ Active"} (Expires: {std.validUntil ? new Date(std.validUntil).toLocaleDateString() : "Never"})
+                            </span>
+                          </div>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                           <span style={{ color: "#c2410c", fontWeight: "800", fontSize: "0.95rem" }}>⭐ {std.stars} Stars</span>
@@ -605,12 +742,44 @@ export const AdminDashboard: React.FC = () => {
             {/* Sparkling AI Header Banner */}
             <div className="ai-studio-header">
               <div>
-                <h3 style={{ fontSize: "1.3rem", color: "#fff", display: "flex", alignItems: "center", gap: "8px" }}>
+                <h3 style={{ fontSize: "1.3rem", color: "#fff", display: "flex", alignItems: "center", gap: "8px", margin: 0 }}>
                   🪄 Gemini AI Studio
                 </h3>
-                <p style={{ fontSize: "0.85rem", color: "rgba(255, 255, 255, 0.9)", marginTop: "4px" }}>
-                  {editingGameId ? "Modify and re-generate existing game details." : "Co-create visual, dyslexia-accessible arithmetic activities using Gemini AI."}
+                <p style={{ fontSize: "0.85rem", color: "rgba(255, 255, 255, 0.9)", marginTop: "6px", marginBottom: "0px" }}>
+                  {editingGameId 
+                    ? "Modify and re-generate existing game details." 
+                    : (geminiApiKey && geminiApiKey.trim().length > 0
+                        ? "Co-create visual, dyslexia-accessible arithmetic activities using Gemini AI." 
+                        : "No API key saved. Creating a game will compile a simulated Balloon Counting template activity.")
+                  }
                 </p>
+                <div
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    padding: "4px 10px",
+                    borderRadius: "12px",
+                    fontSize: "0.75rem",
+                    fontWeight: "800",
+                    marginTop: "10px",
+                    backgroundColor: (geminiApiKey && geminiApiKey.trim().length > 0) ? "rgba(16, 185, 129, 0.25)" : "rgba(245, 158, 11, 0.25)",
+                    color: (geminiApiKey && geminiApiKey.trim().length > 0) ? "#34d399" : "#fbbf24",
+                    border: "1px solid",
+                    borderColor: (geminiApiKey && geminiApiKey.trim().length > 0) ? "rgba(16, 185, 129, 0.4)" : "rgba(245, 158, 11, 0.4)"
+                  }}
+                >
+                  <span
+                    style={{
+                      width: "6px",
+                      height: "6px",
+                      borderRadius: "50%",
+                      backgroundColor: (geminiApiKey && geminiApiKey.trim().length > 0) ? "#10b981" : "#fbbf24",
+                      display: "inline-block"
+                    }}
+                  />
+                  {(geminiApiKey && geminiApiKey.trim().length > 0) ? "Gemini Connected (Live Mode)" : "Using Mock Mode (No API Key)"}
+                </div>
               </div>
               {editingGameId && (
                 <button
@@ -1096,58 +1265,118 @@ export const AdminDashboard: React.FC = () => {
             {logs.length === 0 ? (
               <p style={{ color: "var(--text-secondary)" }}>No student logs recorded yet.</p>
             ) : (
-              <div className="admin-table-wrapper">
-                <table className="admin-table">
-                  <thead>
-                    <tr style={{ borderBottom: "2px solid #cbd5e1", textAlign: "left" }}>
-                      <th>Student</th>
-                      <th>Game</th>
-                      <th>Duration</th>
-                      <th>Attempts</th>
-                      <th>Reward</th>
-                      <th>Device Info</th>
-                      <th>IP Address</th>
-                      <th>Attempts History</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {logs.map(log => (
-                      <tr key={log.id} style={{ borderBottom: "1px solid #e2e8f0" }}>
-                        <td style={{ fontWeight: "700" }}>{log.studentName}</td>
-                        <td>{log.gameTitle}</td>
-                        <td>{log.duration}s</td>
-                        <td>{log.attempts}</td>
-                        <td style={{ color: "var(--success)", fontWeight: "700" }}>{log.rewardEarned}</td>
-                        <td style={{ color: "var(--text-secondary)", fontSize: "0.8rem" }}>
-                          {log.deviceType ? `${log.deviceType} (${log.browser})` : `${log.device} (${log.browser})`}
-                        </td>
-                        <td style={{ color: "var(--text-secondary)", fontSize: "0.8rem" }}>{log.ip || "N/A"}</td>
-                        <td>
-                          {log.attemptsHistory && log.attemptsHistory.length > 0 ? (
-                            <button
-                              onClick={() => setSelectedDetailLog(log)}
-                              className="btn"
-                              style={{
-                                padding: "4px 10px",
-                                backgroundColor: "var(--accent-primary)",
-                                color: "#ffffff",
-                                fontSize: "0.75rem",
-                                borderRadius: "8px",
-                                cursor: "pointer",
-                                boxShadow: "none"
-                              }}
-                            >
-                              🔍 View Attempts ({log.attemptsHistory.length})
-                            </button>
-                          ) : (
-                            <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>N/A</span>
-                          )}
-                        </td>
+              <>
+                <div className="admin-table-wrapper">
+                  <table className="admin-table">
+                    <thead>
+                      <tr style={{ borderBottom: "2px solid #cbd5e1", textAlign: "left" }}>
+                        <th>Student</th>
+                        <th>Game</th>
+                        <th>Duration</th>
+                        <th>Attempts</th>
+                        <th>Reward</th>
+                        <th>Device Info</th>
+                        <th>IP Address</th>
+                        <th>Attempts History</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {logs.slice(0, visibleLogCount).map(log => (
+                        <tr key={log.id} style={{ borderBottom: "1px solid #e2e8f0" }}>
+                          <td style={{ fontWeight: "700" }}>{log.studentName}</td>
+                          <td>{log.gameTitle}</td>
+                          <td>{log.duration}s</td>
+                          <td>{log.attempts}</td>
+                          <td style={{ color: "var(--success)", fontWeight: "700" }}>{log.rewardEarned}</td>
+                          <td style={{ color: "var(--text-secondary)", fontSize: "0.8rem" }}>
+                            {log.deviceType ? `${log.deviceType} (${log.browser})` : `${log.device} (${log.browser})`}
+                          </td>
+                          <td style={{ color: "var(--text-secondary)", fontSize: "0.8rem" }}>{log.ip || "N/A"}</td>
+                          <td>
+                            {log.attemptsHistory && log.attemptsHistory.length > 0 ? (
+                              <button
+                                onClick={() => setSelectedDetailLog(log)}
+                                className="btn"
+                                style={{
+                                  padding: "4px 10px",
+                                  backgroundColor: "var(--accent-primary)",
+                                  color: "#ffffff",
+                                  fontSize: "0.75rem",
+                                  borderRadius: "8px",
+                                  cursor: "pointer",
+                                  boxShadow: "none"
+                                }}
+                              >
+                                🔍 View Attempts ({log.attemptsHistory.length})
+                              </button>
+                            ) : (
+                              <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>N/A</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="admin-mobile-cards">
+                  {logs.slice(0, visibleLogCount).map(log => (
+                    <div
+                      key={log.id}
+                      className="play-card"
+                      style={{
+                        padding: "16px",
+                        border: "1.5px solid #cbd5e1",
+                        backgroundColor: "var(--bg-primary)",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "10px",
+                        borderRadius: "12px",
+                        marginBottom: "12px"
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <strong style={{ fontSize: "1rem" }}>{log.studentName}</strong>
+                        <span style={{ color: "var(--success)", fontWeight: "800", fontSize: "0.85rem" }}>{log.rewardEarned}</span>
+                      </div>
+                      
+                      <div style={{ display: "flex", flexDirection: "column", gap: "4px", fontSize: "0.8rem", color: "var(--text-secondary)" }}>
+                        <div><strong>Activity:</strong> <span style={{ color: "var(--text-primary)" }}>{log.gameTitle}</span></div>
+                        <div><strong>Duration:</strong> {log.duration}s | <strong>Attempts:</strong> {log.attempts}</div>
+                        <div><strong>Device:</strong> {log.deviceType ? `${log.deviceType} (${log.browser})` : `${log.device} (${log.browser})`}</div>
+                        <div><strong>IP:</strong> {log.ip || "N/A"}</div>
+                      </div>
+
+                      {log.attemptsHistory && log.attemptsHistory.length > 0 ? (
+                        <button
+                          onClick={() => setSelectedDetailLog(log)}
+                          className="btn btn-primary"
+                          style={{
+                            padding: "8px 12px",
+                            width: "100%",
+                            fontSize: "0.75rem",
+                            marginTop: "6px",
+                            borderRadius: "8px",
+                            boxShadow: "none"
+                          }}
+                        >
+                          🔍 View Attempts ({log.attemptsHistory.length})
+                        </button>
+                      ) : (
+                        <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)", textAlign: "center", display: "block", marginTop: "6px" }}>
+                          No attempts recorded
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {logs.length > visibleLogCount && (
+                  <div style={{ textAlign: "center", padding: "16px", color: "var(--text-secondary)", fontSize: "0.85rem", fontWeight: "700" }}>
+                    ⏳ Scroll down to load more activity logs...
+                  </div>
+                )}
+              </>
             )}
 
             {/* Action History Breakdown Modal */}
@@ -1261,39 +1490,94 @@ export const AdminDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* TAB 5: ADMIN CONFIG SETTINGS */}
         {activeTab === "settings" && (
-          <form onSubmit={handleSaveSettings} className="play-card" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-            <div>
-              <h3 style={{ fontSize: "1.1rem" }}>Settings Configuration</h3>
-              <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", marginTop: "2px" }}>
-                Configures AI generation keys and student difficulty parameters.
-              </p>
-            </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+            <form onSubmit={handleSaveSettings} className="play-card" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+              <div>
+                <h3 style={{ fontSize: "1.1rem" }}>Settings Configuration</h3>
+                <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", marginTop: "2px" }}>
+                  Configures AI generation keys and student difficulty parameters.
+                </p>
+              </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-              <label htmlFor="gemini-api-key-input" style={{ fontWeight: "700", fontSize: "0.9rem" }}>Google Gemini API Key</label>
-              <input
-                id="gemini-api-key-input"
-                type="password"
-                placeholder="Enter Gemini API key (e.g. AIzaSy...)"
-                value={apiKeyInput}
-                onChange={e => setApiKeyInput(e.target.value)}
-                style={{
-                  padding: "12px",
-                  borderRadius: "10px",
-                  border: "2px solid #cbd5e1"
-                }}
-              />
-              <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>
-                Leaves empty to run with sandbox templates fallback.
-              </span>
-            </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                <label htmlFor="gemini-api-key-input" style={{ fontWeight: "700", fontSize: "0.9rem" }}>Google Gemini API Key</label>
+                <input
+                  id="gemini-api-key-input"
+                  type="password"
+                  placeholder="Enter Gemini API key (e.g. AIzaSy...)"
+                  value={apiKeyInput || ""}
+                  onChange={e => setApiKeyInput(e.target.value)}
+                  style={{
+                    padding: "12px",
+                    borderRadius: "10px",
+                    border: "2px solid #cbd5e1"
+                  }}
+                />
+                <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>
+                  Leaves empty to run with sandbox templates fallback.
+                </span>
+              </div>
 
-            <button type="submit" className="btn btn-primary" style={{ alignSelf: "flex-start", padding: "12px 24px" }}>
-              Save Configuration
-            </button>
-          </form>
+              <button type="submit" className="btn btn-primary" style={{ alignSelf: "flex-start", padding: "12px 24px" }}>
+                Save Configuration
+              </button>
+            </form>
+
+            {/* Manual Alert Broadcast Panel */}
+            <div className="play-card" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              <div>
+                <h3 style={{ fontSize: "1.1rem" }}>📢 Push Notifications Broadcast</h3>
+                <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", marginTop: "2px" }}>
+                  Trigger manual alerts and broadcasts immediately to all active students.
+                </p>
+              </div>
+              
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  <label htmlFor="noti-title-input" style={{ fontWeight: "700", fontSize: "0.9rem" }}>Alert Title</label>
+                  <input
+                    id="noti-title-input"
+                    type="text"
+                    placeholder="e.g. New Challenge! 🏆"
+                    value={manualNotiTitle}
+                    onChange={e => setManualNotiTitle(e.target.value)}
+                    style={{
+                      padding: "10px",
+                      borderRadius: "10px",
+                      border: "2px solid #cbd5e1"
+                    }}
+                  />
+                </div>
+                
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  <label htmlFor="noti-message-input" style={{ fontWeight: "700", fontSize: "0.9rem" }}>Alert Message</label>
+                  <textarea
+                    id="noti-message-input"
+                    placeholder="e.g. Try our new Addition Quest and score stars!"
+                    value={manualNotiMessage}
+                    onChange={e => setManualNotiMessage(e.target.value)}
+                    rows={3}
+                    style={{
+                      padding: "10px",
+                      borderRadius: "10px",
+                      border: "2px solid #cbd5e1",
+                      resize: "none"
+                    }}
+                  />
+                </div>
+              </div>
+              
+              <button
+                type="button"
+                onClick={handleSendManualNotification}
+                className="btn btn-primary"
+                style={{ alignSelf: "flex-start", padding: "12px 24px" }}
+              >
+                Send Alert Broadcast 🚀
+              </button>
+            </div>
+          </div>
         )}
 
       </div>

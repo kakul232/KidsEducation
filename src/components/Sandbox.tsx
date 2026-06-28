@@ -48,7 +48,7 @@ export const Sandbox: React.FC<SandboxProps> = ({ htmlContent, onComplete, onAtt
     return () => {
       window.removeEventListener("message", handleMessage);
     };
-  }, [onComplete, onAttempt]);
+  }, [onComplete, onAttempt, onAction]);
 
   return (
     <div
