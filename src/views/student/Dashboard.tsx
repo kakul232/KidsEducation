@@ -651,8 +651,12 @@ export const Dashboard: React.FC = () => {
                             alignItems: "center",
                             gap: "4px"
                           }}
+                          title="Replay this activity to earn even more stars!"
                         >
-                          ✓ Done ({completedGames[game.id]})
+                          {viewMode === "list" 
+                            ? `✓ Done (${completedGames[game.id]}) • Replay to earn stars! 🌟`
+                            : `✓ Done (${completedGames[game.id]}) • Replay! 🌟`
+                          }
                         </span>
                       )}
 

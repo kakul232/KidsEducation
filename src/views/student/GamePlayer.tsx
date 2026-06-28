@@ -16,10 +16,24 @@ export const GamePlayer: React.FC = () => {
   const [attemptsHistory, setAttemptsHistory] = useState<Array<{ question: string; answer: string; success: boolean; timestamp: string }>>([]);
   const [feedbackText, setFeedbackText] = useState("");
   const [feedbackType, setFeedbackType] = useState<"success" | "fail" | null>(null);
+  const [isReplaying, setIsReplaying] = useState(false);
 
   useEffect(() => {
     if (currentPlayingGame) {
       setIsLoadingGame(true);
+      
+      // Detect if replaying
+      try {
+        const cachedLogsVal = localStorage.getItem("cached_logs");
+        if (cachedLogsVal) {
+          const logs = JSON.parse(cachedLogsVal);
+          const hasCompleted = logs.some((l: any) => l.gameId === currentPlayingGame.id && l.completionRate === 100);
+          setIsReplaying(hasCompleted);
+        }
+      } catch (e) {
+        console.warn("Failed to check if replaying from cached logs:", e);
+      }
+
       const timer = setTimeout(() => {
         setIsLoadingGame(false);
         setStartTime(Date.now());
@@ -30,9 +44,13 @@ export const GamePlayer: React.FC = () => {
 
   useEffect(() => {
     if (currentPlayingGame && !isLoadingGame) {
-      speakText(`Let's play ${currentPlayingGame.title}. Answer the question on the screen!`);
+      if (isReplaying) {
+        speakText(`Let's replay ${currentPlayingGame.title} to earn even more stars! Answer the questions on screen.`);
+      } else {
+        speakText(`Let's play ${currentPlayingGame.title}. Answer the question on the screen!`);
+      }
     }
-  }, [currentPlayingGame, isLoadingGame]);
+  }, [currentPlayingGame, isLoadingGame, isReplaying]);
 
   if (!currentPlayingGame) return null;
   if (isLoadingGame) return <KidsLoader />;
@@ -182,7 +200,11 @@ export const GamePlayer: React.FC = () => {
       origin: { y: 0.6 }
     });
 
-    speakText(`Splendid job! You finished the game and earned ${reward} stars!`);
+    if (isReplaying) {
+      speakText(`Awesome! You completed this game again and earned ${reward} more stars!`);
+    } else {
+      speakText(`Splendid job! You finished the game and earned ${reward} stars!`);
+    }
   };
 
   const handleReadGameTitle = () => {
