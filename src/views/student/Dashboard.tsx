@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useApp } from "../../context/AppContext";
 import LocalDB from "../../services/db";
 import type { Game, ActivityLog } from "../../services/db";
-import { Trophy, Play } from "lucide-react";
+import { Trophy, Play, Lock, Lightbulb, Send } from "lucide-react";
 import { SUBJECTS } from "../../utils/constants";
 import { AvatarIcon } from "../../components/AvatarIcon";
 import { StarBadge } from "../../components/StarBadge";
@@ -29,13 +29,21 @@ const parseGameTitle = (fullTitle: string) => {
 };
 
 export const Dashboard: React.FC = () => {
-  const { currentStudent, setPlayingGame, installPrompt, triggerInstall, notiPermission, requestNotiPermission } = useApp();
+  const { currentStudent, setPlayingGame, installPrompt, triggerInstall, notiPermission, requestNotiPermission, speakText } = useApp();
   const [games, setGames] = useState<Game[]>([]);
   const [selectedSubject, setSelectedSubject] = useState("math");
   const [completedGames, setCompletedGames] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(LocalDB.getCachedGames().length === 0);
   const [viewMode, setViewMode] = useState<"list" | "grid">("grid");
   const [showExitConfirm, setShowExitConfirm] = useState(false);
+
+  // Modals & game requests states
+  const [showRequestModal, setShowRequestModal] = useState(false);
+  const [requestIdeaText, setRequestIdeaText] = useState("");
+  const [isSubmittingIdea, setIsSubmittingIdea] = useState(false);
+  const [showLockModal, setShowLockModal] = useState(false);
+  const [lockedGameTitle, setLockedGameTitle] = useState("");
+  const [showIdeaSuccess, setShowIdeaSuccess] = useState(false);
 
   useEffect(() => {
     // 1. Helper to render games & logs from a given data set
@@ -64,6 +72,13 @@ export const Dashboard: React.FC = () => {
         if (aCompleted && !bCompleted) return 1;
         if (!aCompleted && bCompleted) return -1;
         
+        // Custom Admin Ordering (0 is lowest/default, undefined fits last or 0)
+        const aOrder = a.order !== undefined ? a.order : 99999;
+        const bOrder = b.order !== undefined ? b.order : 99999;
+        if (aOrder !== bOrder) {
+          return aOrder - bOrder;
+        }
+
         // Secondary sort: Newest first
         const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
         const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
@@ -106,6 +121,34 @@ export const Dashboard: React.FC = () => {
     localStorage.removeItem("active_student_id");
     // Reload page or update view to reset state
     window.location.reload();
+  };
+
+  const handleSubmitIdea = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!requestIdeaText.trim()) return;
+
+    setIsSubmittingIdea(true);
+    try {
+      const ideaId = "req_" + Date.now();
+      const newRequest = {
+        id: ideaId,
+        studentId: currentStudent?.id || "guest",
+        studentName: currentStudent?.name || "Guest Student",
+        idea: requestIdeaText.trim(),
+        createdAt: new Date().toISOString()
+      };
+
+      await LocalDB.saveGameRequest(newRequest);
+      speakText("Idea sent! Thank you for sharing your suggestion!");
+      setRequestIdeaText("");
+      setShowRequestModal(false);
+      setShowIdeaSuccess(true);
+    } catch (err) {
+      console.error("Failed to save student request:", err);
+      alert("Oops! Failed to submit your idea. Try again!");
+    } finally {
+      setIsSubmittingIdea(false);
+    }
   };
 
   const isNew = (createdAtString?: string) => {
@@ -404,10 +447,19 @@ export const Dashboard: React.FC = () => {
           >
             {games.map(game => {
               const { emoji, cleanTitle } = parseGameTitle(game.title);
+              const isGameLocked = game.isFree === false && currentStudent?.tier !== "paid";
               return (
                 <PlayCard
                   key={game.id}
-                  onClick={() => setPlayingGame(game)}
+                  onClick={() => {
+                    if (isGameLocked) {
+                      speakText(`Ooh! ${cleanTitle} is a premium game! Ask your teacher or parent to unlock it.`);
+                      setLockedGameTitle(cleanTitle);
+                      setShowLockModal(true);
+                    } else {
+                      setPlayingGame(game);
+                    }
+                  }}
                   style={{
                     display: "flex",
                     flexDirection: viewMode === "list" ? "row" : "column",
@@ -419,9 +471,35 @@ export const Dashboard: React.FC = () => {
                     boxShadow: "0 6px 0 rgba(0,0,0,0.05)",
                     padding: viewMode === "list" ? "16px 20px" : "20px 16px",
                     gap: "16px",
-                    cursor: "pointer"
+                    cursor: "pointer",
+                    position: "relative"
                   }}
                 >
+                  {/* Premium Lock Overlay Badge */}
+                  {isGameLocked && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: "10px",
+                        right: "10px",
+                        backgroundColor: "#ef4444",
+                        color: "white",
+                        borderRadius: "50%",
+                        width: "30px",
+                        height: "30px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        boxShadow: "0 4px 8px rgba(239, 68, 68, 0.4)",
+                        border: "2.5px solid white",
+                        zIndex: 5
+                      }}
+                      title="Premium Game"
+                    >
+                      <Lock size={12} fill="white" />
+                    </div>
+                  )}
+
                   {/* Big Game Logo */}
                   <div
                     style={{
@@ -521,6 +599,25 @@ export const Dashboard: React.FC = () => {
                           ✓ Done ({completedGames[game.id]})
                         </span>
                       )}
+
+                      {/* Premium Game badge indicator */}
+                      {game.isFree === false && (
+                        <span
+                          style={{
+                            fontSize: "0.8rem",
+                            backgroundColor: "#fee2e2",
+                            color: "#b91c1c",
+                            padding: "4px 10px",
+                            borderRadius: "10px",
+                            fontWeight: "800",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "4px"
+                          }}
+                        >
+                          💎 Premium
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -534,7 +631,7 @@ export const Dashboard: React.FC = () => {
                   >
                     <div
                       style={{
-                        backgroundColor: "var(--accent-primary)",
+                        backgroundColor: isGameLocked ? "#cbd5e1" : "var(--accent-primary)",
                         color: "#fff",
                         borderRadius: "50%",
                         width: "48px",
@@ -542,15 +639,64 @@ export const Dashboard: React.FC = () => {
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        boxShadow: "0 6px 12px rgba(79, 70, 229, 0.3)"
+                        boxShadow: isGameLocked ? "none" : "0 6px 12px rgba(79, 70, 229, 0.3)"
                       }}
                     >
-                      <Play size={20} fill="#fff" />
+                      {isGameLocked ? <Lock size={20} fill="#fff" /> : <Play size={20} fill="#fff" />}
                     </div>
                   </div>
                 </PlayCard>
               );
             })}
+
+            {/* Special "Ask for More / Idea Lightbulb" Tile Card */}
+            <PlayCard
+              onClick={() => {
+                speakText("Do you want to share a game idea with your teacher? Tap here!");
+                setShowRequestModal(true);
+              }}
+              style={{
+                display: "flex",
+                flexDirection: viewMode === "list" ? "row" : "column",
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: "var(--bg-secondary)",
+                borderColor: "var(--accent-primary)",
+                borderWidth: "3px",
+                borderStyle: "dashed",
+                boxShadow: "0 6px 0 rgba(0,0,0,0.05)",
+                padding: "20px 16px",
+                gap: "16px",
+                cursor: "pointer",
+                textAlign: "center",
+                minHeight: viewMode === "list" ? "auto" : "180px"
+              }}
+            >
+              <div
+                style={{
+                  fontSize: viewMode === "list" ? "2.2rem" : "2.8rem",
+                  color: "var(--accent-primary)",
+                  animation: "kids-wiggle 2.5s infinite ease-in-out",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: viewMode === "list" ? "60px" : "80px",
+                  height: viewMode === "list" ? "60px" : "80px",
+                  borderRadius: "50%",
+                  backgroundColor: "rgba(79, 70, 229, 0.1)"
+                }}
+              >
+                💡
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "4px", flex: 1 }}>
+                <span style={{ fontWeight: "900", fontSize: "1.1rem", color: "var(--text-primary)" }}>
+                  Ask for More!
+                </span>
+                <span style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>
+                  Share your fun game idea with your teacher!
+                </span>
+              </div>
+            </PlayCard>
           </div>
         )}
       </div>
@@ -644,6 +790,226 @@ export const Dashboard: React.FC = () => {
                 🚪 Yes, Exit
               </button>
             </div>
+          </PlayCard>
+        </div>
+      )}
+
+      {/* 1. Request Game Idea Modal */}
+      {showRequestModal && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(15, 23, 42, 0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 10000,
+            padding: "20px",
+            backdropFilter: "blur(5px)"
+          }}
+        >
+          <PlayCard
+            style={{
+              maxWidth: "420px",
+              width: "100%",
+              padding: "24px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "20px",
+              backgroundColor: "var(--bg-secondary)",
+              border: "4px solid var(--accent-primary)",
+              borderRadius: "24px",
+              boxShadow: "0 12px 24px rgba(0,0,0,0.15)"
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "2.5px dashed #cbd5e1", paddingBottom: "12px" }}>
+              <h3 style={{ fontSize: "1.3rem", fontWeight: "900", color: "var(--text-primary)", margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
+                <span>💡 Shared Idea Studio</span>
+              </h3>
+              <button
+                onClick={() => setShowRequestModal(false)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  fontSize: "1.8rem",
+                  cursor: "pointer",
+                  fontWeight: "900",
+                  color: "var(--text-secondary)"
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitIdea} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: "0.95rem", fontWeight: "600", lineHeight: "1.4" }}>
+                What kind of game do you want to play? Write or describe your game idea below:
+              </p>
+              
+              <textarea
+                value={requestIdeaText}
+                onChange={(e) => setRequestIdeaText(e.target.value)}
+                placeholder="E.g., 'I want a balloon counting game with cute dinosaurs!' or 'A puzzle game where I match shapes!'"
+                rows={4}
+                required
+                style={{
+                  width: "100%",
+                  padding: "16px",
+                  borderRadius: "16px",
+                  border: "2px solid #cbd5e1",
+                  fontSize: "0.95rem",
+                  fontFamily: "inherit",
+                  resize: "none",
+                  boxSizing: "border-box",
+                  backgroundColor: "var(--bg-primary)"
+                }}
+              />
+
+              <div style={{ display: "flex", gap: "10px", width: "100%" }}>
+                <button
+                  type="button"
+                  onClick={() => setShowRequestModal(false)}
+                  className="btn btn-gray"
+                  style={{ flex: 1, padding: "12px", fontSize: "0.95rem", fontWeight: "800" }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingIdea}
+                  className="btn btn-primary"
+                  style={{
+                    flex: 1,
+                    padding: "12px",
+                    fontSize: "0.95rem",
+                    fontWeight: "800",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "8px",
+                    boxShadow: "0 4px 0 var(--accent-secondary)"
+                  }}
+                >
+                  <Send size={16} fill="white" />
+                  <span>{isSubmittingIdea ? "Sending..." : "Send Idea! 🚀"}</span>
+                </button>
+              </div>
+            </form>
+          </PlayCard>
+        </div>
+      )}
+
+      {/* 2. Idea Success Confetti Popup */}
+      {showIdeaSuccess && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(15, 23, 42, 0.4)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 10000,
+            padding: "20px",
+            backdropFilter: "blur(5px)"
+          }}
+        >
+          <PlayCard
+            style={{
+              maxWidth: "360px",
+              width: "100%",
+              textAlign: "center",
+              padding: "28px 24px",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "20px",
+              backgroundColor: "var(--bg-secondary)",
+              border: "4px solid #10b981",
+              borderRadius: "24px"
+            }}
+          >
+            <div style={{ fontSize: "3.5rem", animation: "kids-bounce 2s infinite ease-in-out" }}>🎉</div>
+            <h3 style={{ fontSize: "1.4rem", fontWeight: "900", color: "#065f46", margin: 0 }}>
+              Idea Sent! Yay!
+            </h3>
+            <p style={{ color: "var(--text-secondary)", fontWeight: "700", fontSize: "0.95rem", margin: 0, lineHeight: "1.4" }}>
+              Your game suggestion was sent straight to your teacher! Keep checking your dashboard for new games!
+            </p>
+            <button
+              onClick={() => setShowIdeaSuccess(false)}
+              className="btn btn-success"
+              style={{ width: "100%", padding: "14px", fontSize: "1.05rem", fontWeight: "800", boxShadow: "0 4px 0 #16a34a" }}
+            >
+              Okay! 🎈
+            </button>
+          </PlayCard>
+        </div>
+      )}
+
+      {/* 3. Premium Locked Game Dialog */}
+      {showLockModal && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(15, 23, 42, 0.4)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 10000,
+            padding: "20px",
+            backdropFilter: "blur(5px)"
+          }}
+        >
+          <PlayCard
+            style={{
+              maxWidth: "360px",
+              width: "100%",
+              textAlign: "center",
+              padding: "28px 24px",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "20px",
+              backgroundColor: "var(--bg-secondary)",
+              border: "4px solid #ef4444",
+              borderRadius: "24px"
+            }}
+          >
+            <div style={{ fontSize: "3.5rem", animation: "kids-wiggle 2s infinite ease-in-out" }}>🔒</div>
+            <h3 style={{ fontSize: "1.45rem", fontWeight: "900", color: "#b91c1c", margin: 0 }}>
+              Premium Game!
+            </h3>
+            <p style={{ color: "var(--text-secondary)", fontWeight: "700", fontSize: "0.95rem", margin: 0, lineHeight: "1.4" }}>
+              "{lockedGameTitle}" is a premium quest. Please ask your parent or teacher to unlock it for you!
+            </p>
+            <button
+              onClick={() => setShowLockModal(false)}
+              className="btn btn-danger"
+              style={{
+                width: "100%",
+                padding: "14px",
+                fontSize: "1.05rem",
+                fontWeight: "800",
+                backgroundColor: "#ef4444",
+                borderColor: "#dc2626",
+                color: "#ffffff",
+                boxShadow: "0 4px 0 #dc2626"
+              }}
+            >
+              Go Back
+            </button>
           </PlayCard>
         </div>
       )}

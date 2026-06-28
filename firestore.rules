@@ -32,5 +32,11 @@ service cloud.firestore {
       allow read: if true;
       allow create, update, delete: if request.auth != null;
     }
+
+    // 6. Game Requests collection: Students can submit ideas, only authenticated admins can manage/read
+    match /game_requests/{requestId} {
+      allow create: if true;
+      allow read, update, delete: if request.auth != null;
+    }
   }
 }

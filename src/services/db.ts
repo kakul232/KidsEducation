@@ -17,6 +17,7 @@ export interface Student {
   class?: string;
   phone?: string;
   validUntil?: string;
+  tier?: "free" | "paid";
 }
 
 export interface AttemptDetail {
@@ -50,6 +51,14 @@ export interface ActivityLog {
   attemptsHistory?: AttemptDetail[];
 }
 
+export interface GameRequest {
+  id: string;
+  studentId: string;
+  studentName: string;
+  idea: string;
+  createdAt: string;
+}
+
 export interface Game {
   id: string;
   title: string;
@@ -61,6 +70,8 @@ export interface Game {
   published: boolean;
   createdAt: string;
   assignedStudentId?: string;
+  isFree?: boolean;
+  order?: number;
 }
 
 // Initial default games to populate if none exist
@@ -699,6 +710,35 @@ export const LocalDB = {
     try {
       localStorage.setItem("cached_logs", JSON.stringify(logs));
     } catch (e) {}
+  },
+
+  // Game Requests CRUD
+  async getGameRequests(): Promise<GameRequest[]> {
+    try {
+      const snap = await getDocs(collection(db, "game_requests"));
+      return snap.docs.map(doc => doc.data() as GameRequest);
+    } catch (e) {
+      console.error("Firestore getGameRequests failed", e);
+      return [];
+    }
+  },
+
+  async saveGameRequest(req: GameRequest): Promise<void> {
+    try {
+      await setDoc(doc(db, "game_requests", req.id), req);
+    } catch (e) {
+      console.error("Firestore saveGameRequest failed", e);
+      throw e;
+    }
+  },
+
+  async deleteGameRequest(id: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, "game_requests", id));
+    } catch (e) {
+      console.error("Firestore deleteGameRequest failed", e);
+      throw e;
+    }
   }
 };
 

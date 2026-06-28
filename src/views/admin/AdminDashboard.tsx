@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useApp } from "../../context/AppContext";
 import LocalDB from "../../services/db";
-import type { Game, ActivityLog, Student } from "../../services/db";
+import type { Game, ActivityLog, Student, GameRequest } from "../../services/db";
 import { generateGame } from "../../services/gemini";
 import type { GeneratedGameResponse } from "../../services/gemini";
 import Sandbox from "../../components/Sandbox";
@@ -16,6 +16,8 @@ import {
   AlertTriangle,
   Trash2,
   Lock,
+  Unlock,
+  Lightbulb,
   Edit2,
   Eye,
   EyeOff
@@ -61,13 +63,14 @@ export const AdminDashboard: React.FC = () => {
   const [authError, setAuthError] = useState("");
 
   // Tab State
-  const [activeTab, setActiveTab] = useState<"stats" | "studio" | "games" | "analytics" | "settings">("stats");
+  const [activeTab, setActiveTab] = useState<"stats" | "studio" | "games" | "analytics" | "requests" | "settings">("stats");
 
   // Database lists
   const [students, setStudents] = useState<Student[]>([]);
   const [games, setGames] = useState<Game[]>([]);
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [visibleLogCount, setVisibleLogCount] = useState(20);
+  const [gameRequests, setGameRequests] = useState<GameRequest[]>([]);
 
   // AI Studio Generation Form States
   const [subject] = useState("Mathematics");
@@ -155,10 +158,11 @@ export const AdminDashboard: React.FC = () => {
     await LocalDB.prepopulateDefaultGames();
 
     try {
-      const [studentsList, gamesList, logsList] = await Promise.all([
+      const [studentsList, gamesList, logsList, requestsList] = await Promise.all([
         LocalDB.getStudents(),
         LocalDB.getGames(),
-        LocalDB.getLogs()
+        LocalDB.getLogs(),
+        LocalDB.getGameRequests()
       ]);
       
       // Sort lists by updatedBy / Recent (newest first)
@@ -171,10 +175,14 @@ export const AdminDashboard: React.FC = () => {
       const sortedLogs = [...logsList].sort(
         (a, b) => new Date(b.finishTime || b.startTime || 0).getTime() - new Date(a.finishTime || a.startTime || 0).getTime()
       );
+      const sortedRequests = [...requestsList].sort(
+        (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+      );
 
       setStudents(sortedStudents);
       setGames(sortedGames);
       setLogs(sortedLogs);
+      setGameRequests(sortedRequests);
     } catch (e) {
       console.error("loadData failed in AdminDashboard:", e);
     } finally {
@@ -224,6 +232,65 @@ export const AdminDashboard: React.FC = () => {
       } catch (err: any) {
         console.error("Bulk deletion failed:", err);
         alert("Failed to delete selected students: " + err.message);
+      }
+    }
+  };
+
+  const handleToggleStudentTier = async (student: Student) => {
+    try {
+      const updated = {
+        ...student,
+        tier: student.tier === "paid" ? "free" : ("paid" as any)
+      };
+      await LocalDB.saveStudent(updated);
+      alert(`Updated ${student.name}'s tier to ${updated.tier === "paid" ? "💎 Paid" : "🆓 Free"}`);
+      loadData();
+    } catch (err: any) {
+      console.error("Failed to toggle student tier:", err);
+      alert("Error updating student tier.");
+    }
+  };
+
+  const handleToggleGameTier = async (game: Game) => {
+    try {
+      const updated = {
+        ...game,
+        isFree: game.isFree === false ? true : false
+      };
+      await LocalDB.saveGame(updated);
+      alert(`Updated game "${game.title}" to ${updated.isFree ? "🆓 Free" : "💎 Paid/Premium"}`);
+      loadData();
+    } catch (err: any) {
+      console.error("Failed to toggle game tier:", err);
+      alert("Error updating game tier.");
+    }
+  };
+
+  const handleSaveGameOrder = async (gameId: string, orderVal: number) => {
+    try {
+      const game = games.find(g => g.id === gameId);
+      if (!game) return;
+
+      const updated = {
+        ...game,
+        order: isNaN(orderVal) ? 0 : orderVal
+      };
+      await LocalDB.saveGame(updated);
+      loadData();
+    } catch (err: any) {
+      console.error("Failed to save game order:", err);
+    }
+  };
+
+  const handleDeleteRequest = async (requestId: string) => {
+    if (confirm("Are you sure you want to archive/delete this student request?")) {
+      try {
+        await LocalDB.deleteGameRequest(requestId);
+        alert("Request archived successfully!");
+        loadData();
+      } catch (err: any) {
+        console.error("Failed to archive request:", err);
+        alert("Error archiving request.");
       }
     }
   };
@@ -586,6 +653,7 @@ export const AdminDashboard: React.FC = () => {
           { id: "stats", label: "Overview", icon: <BarChart3 size={18} /> },
           { id: "studio", label: "AI Studio", icon: <Cpu size={18} /> },
           { id: "games", label: "All Games", icon: <BookOpen size={18} /> },
+          { id: "requests", label: "Student Ideas", icon: <Lightbulb size={18} /> },
           { id: "analytics", label: "Analytics", icon: <History size={18} /> },
           { id: "settings", label: "Settings", icon: <SettingsIcon size={18} /> }
         ].map(tab => (
@@ -700,7 +768,21 @@ export const AdminDashboard: React.FC = () => {
                             }}
                           />
                           <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
-                            <span style={{ fontWeight: "700", fontSize: "1rem" }}>{std.name}</span>
+                            <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "6px" }}>
+                              <span style={{ fontWeight: "700", fontSize: "1rem" }}>{std.name}</span>
+                              <span
+                                style={{
+                                  fontSize: "0.75rem",
+                                  backgroundColor: std.tier === "paid" ? "#fee2e2" : "#f1f5f9",
+                                  color: std.tier === "paid" ? "#991b1b" : "#475569",
+                                  padding: "2px 8px",
+                                  borderRadius: "6px",
+                                  fontWeight: "800"
+                                }}
+                              >
+                                {std.tier === "paid" ? "💎 Paid" : "🆓 Free"}
+                              </span>
+                            </div>
                             <span style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>
                               Age: {std.age || "N/A"} | Class: {std.class || "N/A"} | Phone: {std.phone || "N/A"}
                             </span>
@@ -709,8 +791,24 @@ export const AdminDashboard: React.FC = () => {
                             </span>
                           </div>
                         </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                           <span style={{ color: "#c2410c", fontWeight: "800", fontSize: "0.95rem" }}>⭐ {std.stars} Stars</span>
+                          <button
+                            onClick={() => handleToggleStudentTier(std)}
+                            className="btn"
+                            style={{
+                              padding: "6px 10px",
+                              fontSize: "0.75rem",
+                              boxShadow: "none",
+                              backgroundColor: std.tier === "paid" ? "#f1f5f9" : "#fee2e2",
+                              border: std.tier === "paid" ? "1.5px solid #cbd5e1" : "1.5px solid #ef4444",
+                              color: std.tier === "paid" ? "#475569" : "#b91c1c",
+                              fontWeight: "800",
+                              cursor: "pointer"
+                            }}
+                          >
+                            {std.tier === "paid" ? "🆓 Make Free" : "💎 Make Paid"}
+                          </button>
                           <button
                             onClick={() => handleExtendValidity(std.id)}
                             className="btn btn-success"
@@ -1181,7 +1279,7 @@ export const AdminDashboard: React.FC = () => {
                 {games.map(game => (
                   <div key={game.id} className="admin-game-item">
                     <div>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                         <span style={{ fontWeight: "700", fontSize: "1.05rem" }}>{game.title}</span>
                         <span
                           style={{
@@ -1195,17 +1293,61 @@ export const AdminDashboard: React.FC = () => {
                         >
                           {game.published ? "Published" : "Draft / Hidden"}
                         </span>
+                        <span
+                          style={{
+                            fontSize: "0.7rem",
+                            backgroundColor: game.isFree !== false ? "#f1f5f9" : "#fee2e2",
+                            color: game.isFree !== false ? "#475569" : "#991b1b",
+                            padding: "2px 8px",
+                            borderRadius: "6px",
+                            fontWeight: "800"
+                          }}
+                        >
+                          {game.isFree !== false ? "🆓 Free" : "💎 Premium"}
+                        </span>
                       </div>
-                      <div style={{ display: "flex", gap: "8px", marginTop: "4px", fontSize: "0.75rem", color: "var(--text-secondary)" }}>
+                      <div style={{ display: "flex", gap: "8px", marginTop: "4px", fontSize: "0.75rem", color: "var(--text-secondary)", flexWrap: "wrap", alignItems: "center" }}>
                         <span>Topic: {game.topic}</span>
                         <span>•</span>
                         <span>Age: {game.age}</span>
                         <span>•</span>
                         <span style={{ fontWeight: "700" }}>{game.difficulty}</span>
+                        <span>•</span>
+                        <div style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                          <span>Sort Order:</span>
+                          <input
+                            type="number"
+                            defaultValue={game.order || 0}
+                            onBlur={(e) => handleSaveGameOrder(game.id, parseInt(e.target.value))}
+                            style={{
+                              width: "55px",
+                              padding: "2px 4px",
+                              borderRadius: "6px",
+                              border: "1.5px solid #cbd5e1",
+                              fontSize: "0.7rem",
+                              textAlign: "center"
+                            }}
+                          />
+                        </div>
                       </div>
                     </div>
 
-                    <div className="admin-game-actions">
+                    <div className="admin-game-actions" style={{ flexWrap: "wrap", gap: "8px" }}>
+                      <button
+                        onClick={() => handleToggleGameTier(game)}
+                        className="btn"
+                        style={{
+                          padding: "8px",
+                          backgroundColor: game.isFree !== false ? "#f1f5f9" : "#fee2e2",
+                          color: game.isFree !== false ? "#64748b" : "#991b1b",
+                          borderRadius: "10px",
+                          boxShadow: "none"
+                        }}
+                        title={game.isFree !== false ? "Make Paid/Premium" : "Make Free"}
+                      >
+                        {game.isFree !== false ? <Unlock size={18} /> : <Lock size={18} />}
+                      </button>
+
                       <button
                         onClick={() => handleTogglePublish(game)}
                         className="btn"
@@ -1251,6 +1393,99 @@ export const AdminDashboard: React.FC = () => {
                         <Trash2 size={18} />
                       </button>
                     </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB: STUDENT IDEAS & REQUESTS */}
+        {activeTab === "requests" && (
+          <div className="play-card">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
+              <h3 style={{ fontSize: "1.1rem", margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
+                <Lightbulb size={20} color="var(--accent-primary)" />
+                <span>Student Game Requests ({gameRequests.length})</span>
+              </h3>
+            </div>
+            <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", marginBottom: "20px" }}>
+              Below are the game ideas and suggestions sent in by the students from their dashboards.
+            </p>
+
+            {gameRequests.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "40px 20px", border: "2px dashed #cbd5e1", borderRadius: "16px" }}>
+                <Lightbulb size={48} color="#cbd5e1" style={{ marginBottom: "12px" }} />
+                <p style={{ color: "var(--text-secondary)", fontWeight: "600", margin: 0 }}>
+                  No game suggestions submitted yet.
+                </p>
+              </div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "16px" }}>
+                {gameRequests.map((req) => (
+                  <div
+                    key={req.id}
+                    className="play-card"
+                    style={{
+                      border: "2px solid #e2e8f0",
+                      padding: "16px",
+                      borderRadius: "16px",
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "space-between",
+                      gap: "12px",
+                      backgroundColor: "var(--bg-primary)"
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                        <div>
+                          <span style={{ fontWeight: "800", fontSize: "1rem", color: "var(--text-primary)" }}>
+                            {req.studentName}
+                          </span>
+                          <span style={{ display: "block", fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: "2px" }}>
+                            Submitted: {new Date(req.createdAt).toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                      <p
+                        style={{
+                          margin: "12px 0 0 0",
+                          fontSize: "0.9rem",
+                          color: "var(--text-primary)",
+                          backgroundColor: "var(--bg-secondary)",
+                          padding: "10px",
+                          borderRadius: "12px",
+                          borderLeft: "4px solid var(--accent-primary)",
+                          lineHeight: "1.4",
+                          whiteSpace: "pre-wrap"
+                        }}
+                      >
+                        "{req.idea}"
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteRequest(req.id)}
+                      className="btn"
+                      style={{
+                        padding: "8px 12px",
+                        backgroundColor: "#fee2e2",
+                        border: "1.5px solid #fecaca",
+                        color: "#b91c1c",
+                        borderRadius: "10px",
+                        fontSize: "0.8rem",
+                        fontWeight: "800",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "6px",
+                        cursor: "pointer",
+                        width: "100%"
+                      }}
+                    >
+                      <Trash2 size={14} />
+                      <span>Archive Idea</span>
+                    </button>
                   </div>
                 ))}
               </div>
