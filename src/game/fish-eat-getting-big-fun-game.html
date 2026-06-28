@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fish Eat Getting Big - HTML5 Prototype</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            background-color: #0b1d3a;
+            color: #fff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+        #game-container {
+            position: relative;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border: 4px solid #00d2ff;
+            border-radius: 8px;
+        }
+        canvas {
+            background: linear-gradient(to bottom, #104e92 0%, #051937 100%);
+            display: block;
+            cursor: none; /* Hides mouse over game area */
+        }
+        .ui-panel {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            pointer-events: none;
+            font-size: 18px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+        }
+        #game-over-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(5, 25, 55, 0.85);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        #game-over-screen.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        button {
+            background-color: #00d2ff;
+            color: #051937;
+            border: none;
+            padding: 12px 28px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 25px;
+            cursor: pointer;
+            margin-top: 20px;
+            box-shadow: 0 4px 15px rgba(0,210,255,0.4);
+            transition: transform 0.1s, background-color 0.2s;
+        }
+        button:hover {
+            background-color: #fff;
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <canvas id="gameCanvas" width="800" height="500"></canvas>
+        
+        <div class="ui-panel">
+            <div>Score: <span id="scoreVal">0</span></div>
+            <div>Your Size: <span id="sizeVal">15</span></div>
+        </div>
+
+        <div id="game-over-screen">
+            <h1 id="over-title" style="font-size: 48px; color: #ff3b30; margin-bottom: 10px;">GAME OVER</h1>
+            <p style="font-size: 20px;">A larger fish ate you!</p>
+            <p style="margin-top: 10px; color: #aaa;">Final Score: <span id="finalScore">0</span></p>
+            <button id="restartBtn">Play Again</button>
+        </div>
+    </div>
+
+    <p style="margin-top: 15px; color: #7a9bbd; font-size: 14px;">Move your <b>Mouse</b> to guide your orange fish. Eat smaller fish, dodge the big ones!</p>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    // UI Elements
+    const scoreVal = document.getElementById('scoreVal');
+    const sizeVal = document.getElementById('sizeVal');
+    const finalScore = document.getElementById('finalScore');
+    const gameOverScreen = document.getElementById('game-over-screen');
+    const restartBtn = document.getElementById('restartBtn');
+
+    // Game state variables
+    let score = 0;
+    let gameOver = false;
+    let enemyFishArray = [];
+    let particlesArray = [];
+    let spawnTimer = 0;
+
+    // Player Object
+    const player = {
+        x: canvas.width / 2,
+        y: canvas.height / 2,
+        radius: 15, // Starting physical size
+        targetX: canvas.width / 2,
+        targetY: canvas.height / 2,
+        color: '#ff7a00',
+        facingLeft: false,
+        
+        draw() {
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            
+            // Flip graphic depending on horizontal moving direction
+            if (this.facingLeft) {
+                ctx.scale(-1, 1);
+            }
+
+            // Fish Tail
+            ctx.beginPath();
+            ctx.fillStyle = this.color;
+            ctx.moveTo(-this.radius, 0);
+            ctx.lineTo(-this.radius * 1.8, -this.radius * 0.6);
+            ctx.lineTo(-this.radius * 1.8, this.radius * 0.6);
+            ctx.closePath();
+            ctx.fill();
+
+            // Fish Body (Ellipse shape)
+            ctx.beginPath();
+            ctx.ellipse(0, 0, this.radius * 1.3, this.radius, 0, 0, Math.PI * 2);
+            ctx.fillStyle = this.color;
+            ctx.fill();
+
+            // Fish Eye
+            ctx.beginPath();
+            ctx.arc(this.radius * 0.6, -this.radius * 0.3, this.radius * 0.18, 0, Math.PI * 2);
+            ctx.fillStyle = '#fff';
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(this.radius * 0.65, -this.radius * 0.3, this.radius * 0.08, 0, Math.PI * 2);
+            ctx.fillStyle = '#000';
+            ctx.fill();
+
+            ctx.restore();
+        },
+
+        update() {
+            // Smoothly ease toward mouse pointer positioning
+            const dx = this.targetX - this.x;
+            const dy = this.targetY - this.y;
+            this.x += dx * 0.1;
+            this.y += dy * 0.1;
+
+            if (dx < -2) this.facingLeft = true;
+            if (dx > 2) this.facingLeft = false;
+        }
+    };
+
+    // Enemy Fish Class Definition
+    class EnemyFish {
+        constructor() {
+            // 80% chance to spawn from left side, 20% from right side
+            const fromLeft = Math.random() > 0.3;
+            
+            // Scaled variation: Mostly small fish, occasionally massive ones
+            const sizeRoll = Math.random();
+            if (sizeRoll < 0.6) {
+                this.radius = Math.random() * (player.radius * 0.8 - 6) + 6; // Small prey
+            } else if (sizeRoll < 0.85) {
+                this.radius = Math.random() * (player.radius * 1.4 - player.radius * 0.8) + player.radius * 0.8; // Near player size
+            } else {
+                this.radius = Math.random() * (player.radius * 2.5 - player.radius * 1.4) + player.radius * 1.4; // Predators
+            }
+
+            // Ensure dimensions stay within rounded whole metrics
+            this.radius = Math.floor(this.radius);
+
+            if (fromLeft) {
+                this.x = -this.radius * 2;
+                this.speedX = Math.random() * 2 + 1;
+                this.facingLeft = false;
+            } else {
+                this.x = canvas.width + this.radius * 2;
+                this.speedX = -(Math.random() * 2 + 1);
+                this.facingLeft = true;
+            }
+
+            this.y = Math.random() * (canvas.height - this.radius * 2) + this.radius;
+            
+            // Assign custom colors based on comparative size threat
+            if (this.radius < player.radius) {
+                this.color = '#00d2ff'; // Safe to eat
+            } else if (this.radius <= player.radius * 1.3) {
+                this.color = '#ffcc00'; // Warning: Close to your size
+            } else {
+                this.color = '#ff3b30'; // Dangerous predator
+            }
+        }
+
+        draw() {
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            if (this.facingLeft) {
+                ctx.scale(-1, 1);
+            }
+
+            // Tail
+            ctx.beginPath();
+            ctx.fillStyle = this.color;
+            ctx.moveTo(-this.radius, 0);
+            ctx.lineTo(-this.radius * 1.7, -this.radius * 0.5);
+            ctx.lineTo(-this.radius * 1.7, this.radius * 0.5);
+            ctx.closePath();
+            ctx.fill();
+
+            // Main Frame
+            ctx.beginPath();
+            ctx.ellipse(0, 0, this.radius * 1.3, this.radius, 0, 0, Math.PI * 2);
+            ctx.fillStyle = this.color;
+            ctx.fill();
+
+            // Eye
+            ctx.beginPath();
+            ctx.arc(this.radius * 0.5, -this.radius * 0.25, this.radius * 0.15, 0, Math.PI * 2);
+            ctx.fillStyle = '#fff';
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(this.radius * 0.55, -this.radius * 0.25, this.radius * 0.07, 0, Math.PI * 2);
+            ctx.fillStyle = '#000';
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        update() {
+            this.x += this.speedX;
+            // Update color category processing in case player grew larger
+            if (this.radius < player.radius) {
+                this.color = '#00d2ff';
+            }
+        }
+    }
+
+    // Quick burst particle effects when consuming entities
+    class Particle {
+        constructor(x, y, color) {
+            this.x = x;
+            this.y = y;
+            this.radius = Math.random() * 3 + 2;
+            this.speedX = (Math.random() - 0.5) * 6;
+            this.speedY = (Math.random() - 0.5) * 6;
+            this.alpha = 1;
+            this.color = color;
+        }
+        draw() {
+            ctx.save();
+            ctx.globalAlpha = this.alpha;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            ctx.fillStyle = this.color;
+            ctx.fill();
+            ctx.restore();
+        }
+        update() {
+            this.x += this.speedX;
+            this.y += this.speedY;
+            this.alpha -= 0.03;
+        }
+    }
+
+    // Capture tracker values
+    canvas.addEventListener('mousemove', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        player.targetX = e.clientX - rect.left;
+        player.targetY = e.clientY - rect.top;
+    });
+
+    function createExplosion(x, y, color) {
+        for(let i = 0; i < 12; i++) {
+            particlesArray.push(new Particle(x, y, color));
+        }
+    }
+
+    function resetGame() {
+        score = 0;
+        gameOver = false;
+        enemyFishArray = [];
+        particlesArray = [];
+        player.radius = 15;
+        player.x = canvas.width / 2;
+        player.y = canvas.height / 2;
+        
+        scoreVal.innerText = score;
+        sizeVal.innerText = player.radius;
+        gameOverScreen.classList.remove('active');
+    }
+
+    restartBtn.addEventListener('click', resetGame);
+
+    // Primary Execution Game loop
+    function loop() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Background environmental ambient bubble effects occasionally
+        if (Math.random() < 0.03) {
+            ctx.fillStyle = 'rgba(255,255,255,0.15)';
+            ctx.beginPath();
+            ctx.arc(Math.random() * canvas.width, canvas.height + 10, Math.random() * 4 + 1, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        if (!gameOver) {
+            player.update();
+            player.draw();
+
+            // Handle enemy creation pacing
+            spawnTimer++;
+            if (spawnTimer % 35 === 0) {
+                enemyFishArray.push(new EnemyFish());
+            }
+
+            // Update & filter active processing lists 
+            enemyFishArray.forEach((fish, index) => {
+                fish.update();
+                fish.draw();
+
+                // Delete items drifting entirely outside standard view borders
+                if (fish.x < -fish.radius * 3 || fish.x > canvas.width + fish.radius * 3) {
+                    enemyFishArray.splice(index, 1);
+                    return;
+                }
+
+                // Mathematical Circle Collision Detection (DistanceFormula)
+                const dx = player.x - fish.x;
+                const dy = player.y - fish.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                // Trigger overlapping validation bounds
+                if (distance < player.radius + fish.radius * 0.8) {
+                    if (player.radius >= fish.radius) {
+                        // Consumed successfully!
+                        createExplosion(fish.x, fish.y, fish.color);
+                        enemyFishArray.splice(index, 1);
+                        
+                        // Calculate metrics: Gain points and fractionally increment player size
+                        score += fish.radius;
+                        player.radius += Math.floor(fish.radius * 0.15 * 10) / 10; 
+                        
+                        // Enforce maximum safety sizing caps
+                        if (player.radius > 90) player.radius = 90;
+
+                        scoreVal.innerText = Math.floor(score);
+                        sizeVal.innerText = Math.floor(player.radius);
+                    } else {
+                        // Trigger Loss condition
+                        gameOver = true;
+                        finalScore.innerText = Math.floor(score);
+                        gameOverScreen.classList.add('active');
+                    }
+                }
+            });
+
+            // Particles update routine execution
+            particlesArray.forEach((p, index) => {
+                p.update();
+                p.draw();
+                if(p.alpha <= 0) particlesArray.splice(index, 1);
+            });
+        }
+
+        requestAnimationFrame(loop);
+    }
+
+    // Run Initial Setup call
+    loop();
+</script>
+
+</body>
+</html>
