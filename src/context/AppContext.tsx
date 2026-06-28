@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import LocalDB from "../services/db";
 import type { Student, Game, ActivityLog } from "../services/db";
-import { auth as firebaseAuth } from "../services/firebase";
+import { auth as firebaseAuth, db } from "../services/firebase";
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { getClientDetails } from "../utils/device";
 
 export type ViewState = "onboarding" | "dashboard" | "game_player" | "admin_auth" | "admin_dashboard";
@@ -23,10 +24,10 @@ interface AppContextType {
   geminiApiKey: string;
   speakText: (text: string) => void;
   setView: (view: ViewState) => void;
-  setOnboarding: (name: string, avatar: string) => Promise<void>;
+  setOnboarding: (name: string, avatar: string, age: number, studentClass: string, phone: string) => Promise<void>;
   setPlayingGame: (game: Game | null) => void;
   updateAccessibility: (config: Partial<AccessibilityConfig>) => void;
-  saveApiKey: (key: string) => void;
+  saveApiKey: (key: string) => Promise<void> | void;
   addStars: (count: number) => void;
   logOutAdmin: () => Promise<void>;
   logInAdmin: (email?: string, password?: string) => Promise<boolean>;
@@ -83,9 +84,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Listen to Firebase Auth state changes
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(firebaseAuth, (user) => {
+    const unsubscribeAuth = onAuthStateChanged(firebaseAuth, async (user) => {
       if (user) {
         setIsAdminLoggedIn(true);
+        // Load API Key from Firestore for this user
+        try {
+          const docRef = doc(db, "admin_settings", user.uid);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            if (data.geminiApiKey) {
+              setGeminiApiKey(data.geminiApiKey);
+              localStorage.setItem("gemini_api_key", data.geminiApiKey);
+            }
+          }
+        } catch (e) {
+          console.warn("Failed to load Gemini API key from Firestore:", e);
+        }
       } else {
         setIsAdminLoggedIn(false);
       }
@@ -131,7 +146,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const setOnboarding = async (name: string, avatar: string) => {
+  const setOnboarding = async (name: string, avatar: string, age: number, studentClass: string, phone: string) => {
     // Collect IP, Device ID, and system metadata
     const details = await getClientDetails();
     
@@ -149,6 +164,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       
       return false;
     });
+
+    const validUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
     if (matchedStudent) {
       console.log("Matching student profile found! Logging into existing account:", matchedStudent);
@@ -182,7 +199,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ip: details.ip,
         userAgent: details.userAgent,
         browser: details.browser,
-        deviceType: details.deviceType
+        deviceType: details.deviceType,
+        age,
+        class: studentClass,
+        phone,
+        validUntil
       };
 
       await LocalDB.saveStudent(newStudent);
@@ -197,9 +218,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setAccessibility(prev => ({ ...prev, ...config }));
   };
 
-  const saveApiKey = (key: string) => {
+  const saveApiKey = async (key: string) => {
     setGeminiApiKey(key);
     localStorage.setItem("gemini_api_key", key);
+
+    // Save to Firestore in respect to this admin user
+    const user = firebaseAuth.currentUser;
+    if (user) {
+      try {
+        const docRef = doc(db, "admin_settings", user.uid);
+        await setDoc(docRef, { geminiApiKey: key }, { merge: true });
+      } catch (e) {
+        console.error("Failed to save API key to Firestore:", e);
+      }
+    }
   };
 
   const addStars = (count: number) => {
@@ -250,28 +282,49 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const recordActivity = (logDetails: Omit<ActivityLog, "id" | "studentId" | "studentName" | "gameId" | "gameTitle" | "device" | "browser">) => {
     if (!currentStudent || !currentPlayingGame) return;
 
-    // Detect browser/device
-    const userAgent = navigator.userAgent;
-    let browser = "Unknown Browser";
-    if (userAgent.indexOf("Chrome") > -1) browser = "Chrome";
-    else if (userAgent.indexOf("Safari") > -1) browser = "Safari";
-    else if (userAgent.indexOf("Firefox") > -1) browser = "Firefox";
+    const captureAndSave = async () => {
+      // Detect browser/device
+      const userAgent = navigator.userAgent;
+      let browser = "Unknown Browser";
+      if (userAgent.indexOf("Chrome") > -1) browser = "Chrome";
+      else if (userAgent.indexOf("Safari") > -1) browser = "Safari";
+      else if (userAgent.indexOf("Firefox") > -1) browser = "Firefox";
 
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(userAgent);
-    const device = isMobile ? "Mobile Device" : "Computer/Tablet";
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(userAgent);
+      const device = isMobile ? "Mobile Device" : "Computer/Tablet";
 
-    const log: ActivityLog = {
-      id: "log_" + Math.random().toString(36).substr(2, 9),
-      studentId: currentStudent.id,
-      studentName: currentStudent.name,
-      gameId: currentPlayingGame.id,
-      gameTitle: currentPlayingGame.title,
-      device,
-      browser,
-      ...logDetails
+      let ip = "";
+      let deviceId = "";
+      let deviceType = "";
+
+      try {
+        const details = await getClientDetails();
+        ip = details.ip || "";
+        deviceId = details.deviceId || "";
+        deviceType = details.deviceType || "";
+      } catch (err) {
+        console.warn("Could not retrieve client details for activity log:", err);
+      }
+
+      const log: ActivityLog = {
+        id: "log_" + Math.random().toString(36).substr(2, 9),
+        studentId: currentStudent.id,
+        studentName: currentStudent.name,
+        gameId: currentPlayingGame.id,
+        gameTitle: currentPlayingGame.title,
+        device,
+        browser,
+        ip,
+        deviceId,
+        deviceType,
+        userAgent,
+        ...logDetails
+      };
+
+      await LocalDB.saveLog(log);
     };
 
-    LocalDB.saveLog(log);
+    captureAndSave();
   };
 
   return (

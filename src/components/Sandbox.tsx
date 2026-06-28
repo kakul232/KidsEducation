@@ -2,11 +2,12 @@ import React, { useEffect, useRef, useState } from "react";
 
 interface SandboxProps {
   htmlContent: string;
-  onComplete: (correctCount: number, incorrectCount: number) => void;
+  onComplete: (correctCount: number, incorrectCount: number, stars?: number) => void;
   onAttempt: () => void;
+  onAction?: (question: string, answer: string, success: boolean) => void;
 }
 
-export const Sandbox: React.FC<SandboxProps> = ({ htmlContent, onComplete, onAttempt }) => {
+export const Sandbox: React.FC<SandboxProps> = ({ htmlContent, onComplete, onAttempt, onAction }) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [blobUrl, setBlobUrl] = useState<string>("");
 
@@ -31,9 +32,13 @@ export const Sandbox: React.FC<SandboxProps> = ({ htmlContent, onComplete, onAtt
         const data = event.data;
         if (data && typeof data === "object") {
           if (data.type === "game_complete") {
-            onComplete(data.correctCount || 1, data.incorrectCount || 0);
+            onComplete(data.correctCount || 0, data.incorrectCount || 0, data.stars);
           } else if (data.type === "game_attempt") {
             onAttempt();
+          } else if (data.type === "game_action") {
+            if (onAction) {
+              onAction(data.question || "Unknown Question", data.answer || "Unknown Answer", !!data.success);
+            }
           }
         }
       }
@@ -49,9 +54,9 @@ export const Sandbox: React.FC<SandboxProps> = ({ htmlContent, onComplete, onAtt
     <div
       style={{
         width: "100%",
-        maxWidth: "400px",
+        maxWidth: "460px",
         margin: "0 auto",
-        aspectRatio: "3 / 4.5",
+        aspectRatio: "9 / 16",
         borderRadius: "24px",
         overflow: "hidden",
         border: "5px solid var(--text-primary)",

@@ -11,8 +11,11 @@ export const GamePlayer: React.FC = () => {
   const [attempts, setAttempts] = useState(0);
   const [hintsUsed] = useState(0);
   const [isComplete, setIsComplete] = useState(false);
-  const [starsAwarded] = useState(5);
+  const [starsAwarded, setStarsAwarded] = useState(5);
   const [isLoadingGame, setIsLoadingGame] = useState(true);
+  const [attemptsHistory, setAttemptsHistory] = useState<Array<{ question: string; answer: string; success: boolean; timestamp: string }>>([]);
+  const [feedbackText, setFeedbackText] = useState("");
+  const [feedbackType, setFeedbackType] = useState<"success" | "fail" | null>(null);
 
   useEffect(() => {
     if (currentPlayingGame) {
@@ -79,27 +82,74 @@ export const GamePlayer: React.FC = () => {
     speakText("Great try! Let's keep trying together.");
   };
 
-  const handleComplete = (correctCount: number, incorrectCount: number) => {
+  const handleAction = (question: string, answer: string, success: boolean) => {
+    const newAttempt = {
+      question,
+      answer,
+      success,
+      timestamp: new Date().toISOString()
+    };
+    setAttemptsHistory(prev => [...prev, newAttempt]);
+
+    // Configure floating kids-friendly feedback text
+    const successPhrases = ["Hurray! 🎉", "Yeahhh! 🌟", "Awesome! 🎈", "Brilliant! 🚀", "Superb! 🌈", "Wahoo! 🥳", "Great job! 🧸"];
+    const failPhrases = ["Try again! 💪", "Boo... Let's try again! 🧸", "Keep trying! ❤️", "You can do it! 🌟", "Almost had it! 🌈"];
+
+    const phrase = success
+      ? successPhrases[Math.floor(Math.random() * successPhrases.length)]
+      : failPhrases[Math.floor(Math.random() * failPhrases.length)];
+
+    setFeedbackText(phrase);
+    setFeedbackType(success ? "success" : "fail");
+
+    // Clear overlay after 1.5 seconds
+    setTimeout(() => {
+      setFeedbackText("");
+      setFeedbackType(null);
+    }, 1500);
+
+    // Track attempt sounds & speech
+    if (!success) {
+      setAttempts(prev => prev + 1);
+      playTrySound();
+      speakText("Great try! Let's keep trying together.");
+    } else {
+      speakText("You got it! Outstanding! 🎉");
+    }
+  };
+
+  const handleComplete = (correctCount: number, incorrectCount: number, customStars?: number) => {
     if (isComplete) return;
     setIsComplete(true);
 
     const endTime = Date.now();
     const duration = Math.round((endTime - startTime) / 1000);
 
+    // Default to 5 stars if neither customStars nor correctCount is valid
+    let reward = 5;
+    if (customStars !== undefined) {
+      reward = customStars;
+    } else if (correctCount > 0) {
+      reward = correctCount;
+    }
+
+    setStarsAwarded(reward);
+
     // Reward stars
-    addStars(starsAwarded);
+    addStars(reward);
 
     // Save analytics log
     recordActivity({
       startTime: new Date(startTime).toISOString(),
       finishTime: new Date(endTime).toISOString(),
       duration,
-      attempts: attempts + 1,
+      attempts: attemptsHistory.length || attempts + 1,
       correctAnswers: correctCount,
       incorrectAnswers: incorrectCount,
       hintsUsed,
       completionRate: 100,
-      rewardEarned: `⭐ ${starsAwarded} Stars`
+      rewardEarned: `⭐ ${starsAwarded} Stars`,
+      attemptsHistory
     });
 
     // Run celebration
@@ -118,7 +168,7 @@ export const GamePlayer: React.FC = () => {
   };
 
   return (
-    <div className="container animate-slide-up" style={{ minHeight: "100vh", padding: "16px" }}>
+    <div className="container animate-slide-up" style={{ minHeight: "100vh", padding: "12px 8px 30px" }}>
       
       {/* Header controls */}
       <div
@@ -126,7 +176,7 @@ export const GamePlayer: React.FC = () => {
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          marginBottom: "16px"
+          marginBottom: "10px"
         }}
       >
         <button
@@ -162,12 +212,12 @@ export const GamePlayer: React.FC = () => {
         <div style={{ width: "50px" }}></div> {/* balance header spacer */}
       </div>
 
-      {/* Sandbox Game Display */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
         <Sandbox
           htmlContent={currentPlayingGame.htmlContent}
           onComplete={handleComplete}
           onAttempt={handleAttempt}
+          onAction={handleAction}
         />
       </div>
 
@@ -250,7 +300,7 @@ export const GamePlayer: React.FC = () => {
               }}
             >
               <div style={{ display: "flex", gap: "2px" }}>
-                {[...Array(3)].map((_, i) => (
+                {[...Array(Math.max(1, Math.min(starsAwarded, 5)))].map((_, i) => (
                   <Star key={i} size={28} fill="#facc15" color="#eab308" />
                 ))}
               </div>
@@ -270,6 +320,56 @@ export const GamePlayer: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Absolute floating keyframe micro-animations overlay for visual action feedback */}
+      {feedbackText && (
+        <div
+          style={{
+            position: "fixed",
+            top: "45%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            backgroundColor: feedbackType === "success" ? "#10b981" : "#ef4444",
+            color: "#ffffff",
+            padding: "16px 36px",
+            borderRadius: "30px",
+            fontSize: "2.3rem",
+            fontWeight: "900",
+            zIndex: 99999,
+            pointerEvents: "none",
+            boxShadow: "0 12px 30px rgba(0,0,0,0.3)",
+            border: "4px solid #ffffff",
+            animation: "floatUpAndFade 1.5s ease-out forwards",
+            textAlign: "center",
+            whiteSpace: "nowrap"
+          }}
+        >
+          {feedbackText}
+        </div>
+      )}
+
+      <style>{`
+        @keyframes floatUpAndFade {
+          0% {
+            opacity: 0;
+            transform: translate(-50%, -30%) scale(0.5);
+          }
+          15% {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1.15);
+          }
+          30% {
+            transform: translate(-50%, -50%) scale(1.0);
+          }
+          80% {
+            opacity: 1;
+            transform: translate(-50%, -55%) scale(1.0);
+          }
+          100% {
+            opacity: 0;
+            transform: translate(-50%, -65%) scale(0.85);
+          }
+        }
+      `}</style>
     </div>
   );
 };

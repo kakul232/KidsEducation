@@ -9,6 +9,9 @@ import KidsLoader from "../../components/KidsLoader";
 export const Onboarding: React.FC = () => {
   const { setOnboarding, setView } = useApp();
   const [name, setName] = useState("");
+  const [age, setAge] = useState("");
+  const [studentClass, setStudentClass] = useState("");
+  const [phone, setPhone] = useState("");
   const [selectedAvatar, setSelectedAvatar] = useState("bear");
   const [errorMsg, setErrorMsg] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -19,10 +22,18 @@ export const Onboarding: React.FC = () => {
       setErrorMsg("Please tell us your name! 😊");
       return;
     }
+    if (!age.trim() || isNaN(parseInt(age)) || parseInt(age) <= 0) {
+      setErrorMsg("Please tell us your age! 🎂");
+      return;
+    }
+    if (!phone.trim()) {
+      setErrorMsg("Please tell us your parent's phone number! 📱");
+      return;
+    }
     setErrorMsg("");
     setIsLoading(true);
     try {
-      await setOnboarding(name.trim(), selectedAvatar);
+      await setOnboarding(name.trim(), selectedAvatar, parseInt(age), studentClass.trim(), phone.trim());
     } catch (err) {
       console.error("Onboarding failed:", err);
       setErrorMsg("Oops! Something went wrong. Try again! 😊");
@@ -61,12 +72,12 @@ export const Onboarding: React.FC = () => {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
           {/* Name Input */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
             <label
               htmlFor="student-name-input"
-              style={{ fontWeight: "700", color: "var(--text-primary)", fontSize: "1.1rem" }}
+              style={{ fontWeight: "700", color: "var(--text-primary)", fontSize: "1.05rem" }}
             >
               What is your name?
             </label>
@@ -79,9 +90,113 @@ export const Onboarding: React.FC = () => {
               maxLength={20}
               style={{
                 width: "100%",
-                padding: "16px",
-                fontSize: "1.1rem",
-                borderRadius: "16px",
+                padding: "12px",
+                fontSize: "1rem",
+                borderRadius: "12px",
+                border: "3px solid #cbd5e1",
+                backgroundColor: "var(--bg-primary)",
+                color: "var(--text-primary)",
+                fontWeight: "600",
+                textAlign: "center"
+              }}
+            />
+          </div>
+
+          {/* Age Input Dropdown */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            <label
+              htmlFor="student-age-input"
+              style={{ fontWeight: "700", color: "var(--text-primary)", fontSize: "1.05rem" }}
+            >
+              How old are you? (Age)
+            </label>
+            <select
+              id="student-age-input"
+              value={age}
+              onChange={(e) => setAge(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "12px",
+                fontSize: "1rem",
+                borderRadius: "12px",
+                border: "3px solid #cbd5e1",
+                backgroundColor: "var(--bg-primary)",
+                color: "var(--text-primary)",
+                fontWeight: "600",
+                textAlign: "center",
+                cursor: "pointer"
+              }}
+            >
+              <option value="">Select age... 🎂</option>
+              <option value="3">3 Years Old</option>
+              <option value="4">4 Years Old</option>
+              <option value="5">5 Years Old</option>
+              <option value="6">6 Years Old</option>
+              <option value="7">7 Years Old</option>
+              <option value="8">8 Years Old</option>
+              <option value="9">9 Years Old</option>
+              <option value="10">10 Years Old</option>
+              <option value="11">11 Years Old</option>
+              <option value="12">12 Years Old</option>
+            </select>
+          </div>
+
+          {/* Class Input Dropdown */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            <label
+              htmlFor="student-class-input"
+              style={{ fontWeight: "700", color: "var(--text-primary)", fontSize: "1.05rem" }}
+            >
+              What class are you in? (Optional)
+            </label>
+            <select
+              id="student-class-input"
+              value={studentClass}
+              onChange={(e) => setStudentClass(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "12px",
+                fontSize: "1rem",
+                borderRadius: "12px",
+                border: "3px solid #cbd5e1",
+                backgroundColor: "var(--bg-primary)",
+                color: "var(--text-primary)",
+                fontWeight: "600",
+                textAlign: "center",
+                cursor: "pointer"
+              }}
+            >
+              <option value="">Select class (Optional) 🏫</option>
+              <option value="Preschool">Preschool 🧸</option>
+              <option value="Kindergarten">Kindergarten 🎒</option>
+              <option value="Grade 1">Grade 1 ✏️</option>
+              <option value="Grade 2">Grade 2 📚</option>
+              <option value="Grade 3">Grade 3 🧠</option>
+              <option value="Grade 4">Grade 4 🌌</option>
+              <option value="Grade 5">Grade 5 🚀</option>
+            </select>
+          </div>
+
+          {/* Phone No Input */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            <label
+              htmlFor="student-phone-input"
+              style={{ fontWeight: "700", color: "var(--text-primary)", fontSize: "1.05rem" }}
+            >
+              Parent's Phone Number
+            </label>
+            <input
+              id="student-phone-input"
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="Type phone number here..."
+              maxLength={15}
+              style={{
+                width: "100%",
+                padding: "12px",
+                fontSize: "1rem",
+                borderRadius: "12px",
                 border: "3px solid #cbd5e1",
                 backgroundColor: "var(--bg-primary)",
                 color: "var(--text-primary)",
@@ -90,7 +205,7 @@ export const Onboarding: React.FC = () => {
               }}
             />
             {errorMsg && (
-              <span style={{ color: "var(--accent-primary)", fontWeight: "600", fontSize: "0.95rem" }}>
+              <span style={{ color: "var(--accent-primary)", fontWeight: "700", fontSize: "0.9rem", textAlign: "center", marginTop: "4px", display: "block" }}>
                 {errorMsg}
               </span>
             )}

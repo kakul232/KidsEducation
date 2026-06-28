@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Magical Ice Cream Shop!</title>
+    <style>
+        :root {
+            --bg-color: #f7f9fc;
+            --text-color: #2c3e50;
+            --font-family: 'Arial Rounded MT Bold', 'Comic Sans MS', sans-serif;
+        }
+
+        body {
+            font-family: var(--font-family);
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #fff5f5 0%, #eef2f7 100%);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            min-height: 100vh;
+            overflow-x: hidden;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .game-wrapper {
+            width: 100%;
+            max-width: 430px;
+            height: 100vh;
+            max-height: 932px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            box-sizing: border-box;
+            padding: 12px;
+            position: relative;
+        }
+
+        .hud-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 12px 20px;
+            border-radius: 20px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.06);
+            box-sizing: border-box;
+            border: 3px solid #ffe3e3;
+            z-index: 5;
+        }
+
+        .hud-stat {
+            font-size: 22px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .score-val { color: #ff6b6b; }
+        .stars-val { color: #f1c40f; }
+
+        /* Full Screen Button Container Layout Styling */
+        .controls-container {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            margin: 4px 0;
+        }
+
+        .fullscreen-toggle {
+            background: #2ecc71;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 14px;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px #27ae60;
+            transition: all 0.1s;
+        }
+        .fullscreen-toggle:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px #27ae60;
+        }
+
+        .order-speech-bubble {
+            background: white;
+            border: 4px solid #74b9ff;
+            border-radius: 24px;
+            padding: 12px 16px;
+            margin: 5px 0 10px 0;
+            font-size: 18px;
+            font-weight: bold;
+            text-align: center;
+            position: relative;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.05);
+            animation: bounce 2s infinite ease-in-out;
+        }
+
+        .play-arena {
+            flex-grow: 1;
+            width: 100%;
+            background: linear-gradient(to bottom, #e0f7fa 0%, #fffde7 100%);
+            border-radius: 28px;
+            border: 5px solid #81ecec;
+            position: relative;
+            overflow: hidden;
+            box-shadow: inset 0 4px 20px rgba(0,0,0,0.05);
+        }
+
+        .cone-target {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90px;
+            height: 120px;
+            z-index: 2;
+        }
+
+        .waffle-cone {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #f3a683 0%, #cf8a67 100%);
+            clip-path: polygon(0 0, 100% 0, 50% 100%);
+            position: relative;
+            box-shadow: 0 8px 0 rgba(0,0,0,0.1);
+        }
+
+        .waffle-pattern {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-image: linear-gradient(45deg, rgba(0,0,0,0.05) 25%, transparent 25%, transparent 75%, rgba(0,0,0,0.05) 75%),
+                              linear-gradient(45deg, rgba(0,0,0,0.05) 25%, transparent 25%, transparent 75%, rgba(0,0,0,0.05) 75%);
+            background-size: 16px 16px;
+            background-position: 0 0, 8px 8px;
+        }
+
+        .scoops-stack-container {
+            position: absolute;
+            bottom: 140px;
+            left: 0;
+            width: 100%;
+            display: flex;
+            flex-direction: column-reverse;
+            align-items: center;
+            z-index: 3;
+        }
+
+        .stacked-scoop {
+            width: 105px;
+            height: 85px;
+            border-radius: 50% 50% 45% 45%;
+            margin-bottom: -42px;
+            position: relative;
+            box-shadow: inset 0 -10px 0 rgba(0,0,0,0.1), 0 4px 8px rgba(0,0,0,0.1);
+            animation: dropScoop 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .flavor-dock {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 14px 10px;
+            border-radius: 24px;
+            box-shadow: 0 -8px 24px rgba(0,0,0,0.06);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            box-sizing: border-box;
+            border: 4px solid #ffe3e3;
+            margin-top: 10px;
+            z-index: 5;
+        }
+
+        .flavor-scoop-source {
+            width: 76px;
+            height: 76px;
+            border-radius: 50%;
+            position: relative;
+            cursor: grab;
+            box-shadow: inset 0 -8px 0 rgba(0,0,0,0.15), 0 6px 12px rgba(0,0,0,0.1);
+            touch-action: none;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .flavor-scoop-source:active {
+            cursor: grabbing;
+        }
+
+        .flavor-badge {
+            background: rgba(255,255,255,0.85);
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #2c3e50;
+            pointer-events: none;
+        }
+
+        .flavor-pink { background: #ff7675; }
+        .flavor-brown { background: #8d6e63; }
+        .flavor-yellow { background: #ffeaa7; }
+        .flavor-green { background: #55efc4; }
+
+        .dragging-clone {
+            position: fixed;
+            width: 86px;
+            height: 86px;
+            border-radius: 50%;
+            z-index: 9999;
+            pointer-events: none;
+            box-shadow: 0 12px 24px rgba(0,0,0,0.2), inset 0 -8px 0 rgba(0,0,0,0.15);
+            transform: translate(-50%, -50%);
+        }
+
+        .math-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(44, 62, 80, 0.85);
+            backdrop-filter: blur(8px);
+            z-index: 1000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .math-card {
+            background: white;
+            width: 100%;
+            max-width: 360px;
+            border-radius: 32px;
+            border: 8px solid #ff7675;
+            padding: 24px;
+            box-sizing: border-box;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            animation: popUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .math-equation {
+            font-size: 42px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin: 20px 0;
+            background: #f1f2f6;
+            padding: 15px;
+            border-radius: 20px;
+            border: 3px dashed #b2bec3;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .math-options-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-top: 20px;
+        }
+
+        .math-btn {
+            padding: 18px;
+            font-size: 26px;
+            font-weight: bold;
+            color: white;
+            background: #74b9ff;
+            border: none;
+            border-radius: 20px;
+            box-shadow: 0 6px #0984e3;
+            cursor: pointer;
+            transition: all 0.1s;
+        }
+
+        .math-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px #0984e3;
+        }
+
+        .feedback-banner {
+            font-size: 22px;
+            font-weight: bold;
+            height: 30px;
+            margin-top: 10px;
+        }
+
+        .splash-overlay {
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(135deg, #a8e6cf 0%, #dcedc1(100%));
+            background: linear-gradient(135deg, #a8e6cf 0%, #dcedc1 100%);
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .start-btn {
+            background: #ff7675;
+            color: white;
+            font-size: 28px;
+            font-weight: bold;
+            padding: 20px 45px;
+            border: none;
+            border-radius: 24px;
+            box-shadow: 0 8px #d63031;
+            cursor: pointer;
+            margin-top: 30px;
+        }
+
+        .start-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 4px #d63031;
+        }
+
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            z-index: 999;
+            animation: fall linear forwards;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-6px); }
+        }
+
+        @keyframes popUp {
+            from { transform: scale(0.8); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        @keyframes dropScoop {
+            from { transform: translateY(-100px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        @keyframes fall {
+            to { transform: translateY(100vh) rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="splash-overlay" id="splashScreen">
+        <h1 style="font-size: 38px; color: #2c3e50; margin-bottom: 10px;">🍦 Magical Ice Cream Shop! 🍨</h1>
+        <p style="font-size: 20px; color: #57606f; max-width: 320px; font-weight: bold;">Build delicious cones, count scoops, and solve fun math puzzles!</p>
+        <div style="font-size: 100px; margin: 15px 0;">🍦✨</div>
+        <button class="start-btn" id="playButton">▶ PLAY NOW</button>
+    </div>
+
+    <div class="game-wrapper">
+        <header class="hud-bar" role="banner">
+            <div class="hud-stat" aria-live="polite">🍦 Score: <span id="scoreVal" class="score-val">0</span></div>
+            <div class="hud-stat" aria-live="polite">⭐ Stars: <span id="starsVal" class="stars-val">0</span></div>
+        </header>
+
+        <div class="controls-container">
+            <button class="fullscreen-toggle" id="fullscreenToggle" aria-label="Toggle Fullscreen Mode">Full Screen 📺</button>
+        </div>
+
+        <section class="order-speech-bubble" id="orderSpeechBubble" aria-live="assertive">
+            Loading your first order...
+        </section>
+
+        <main class="play-arena" id="playArena">
+            <div class="scoops-stack-container" id="scoopsStackContainer"></div>
+            <div class="cone-target" id="coneTarget">
+                <div class="waffle-cone">
+                    <div class="waffle-pattern"></div>
+                </div>
+            </div>
+        </main>
+
+        <footer class="flavor-dock" role="contentinfo" aria-label="Ice Cream Flavor Selection">
+            <div class="flavor-scoop-source flavor-pink" data-flavor="Strawberry" data-color="#ff7675">
+                <span class="flavor-badge">🍓</span>
+            </div>
+            <div class="flavor-scoop-source flavor-brown" data-flavor="Chocolate" data-color="#8d6e63">
+                <span class="flavor-badge">🍫</span>
+            </div>
+            <div class="flavor-scoop-source flavor-yellow" data-flavor="Vanilla" data-color="#ffeaa7">
+                <span class="flavor-badge">🍦</span>
+            </div>
+            <div class="flavor-scoop-source flavor-green" data-flavor="Mint" data-color="#55efc4">
+                <span class="flavor-badge">🌿</span>
+            </div>
+        </footer>
+    </div>
+
+    <div class="math-overlay" id="mathOverlay">
+        <div class="math-card" role="dialog" aria-labelledby="mathTitle">
+            <h2 id="mathTitle" style="color: #ff6b6b; font-size: 28px; margin-top: 0;">✨ Magical Math! ✨</h2>
+            <p style="font-size: 18px; font-weight: bold; color: #57606f;">Count your scoops to solve the equation!</p>
+            
+            <div class="math-equation">
+                <span id="eqLeft">0</span>
+                <span>+</span>
+                <span id="eqRight">0</span>
+                <span>=</span>
+                <span style="color: #74b9ff;">?</span>
+            </div>
+
+            <div class="math-options-grid" id="mathOptionsGrid"></div>
+            <div class="feedback-banner" id="feedbackBanner"></div>
+        </div>
+    </div>
+
+<script>
+class SoundEngine {
+    constructor() { this.ctx = null; }
+    init() { if (!this.ctx) { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } }
+    playTone(freq, type, duration, vol = 0.1) {
+        this.init(); if (!this.ctx) return;
+        const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+        osc.type = type; osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+        gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.00001, this.ctx.currentTime + duration);
+        osc.connect(gain); gain.connect(this.ctx.destination);
+        osc.start(); osc.stop(this.ctx.currentTime + duration);
+    }
+    scoopDrop() { this.playTone(280, 'sine', 0.25, 0.25); }
+    correctAnswer() {
+        this.playTone(523.25, 'sine', 0.15, 0.2);
+        setTimeout(() => this.playTone(659.25, 'sine', 0.25, 0.2), 120);
+    }
+    wrongAnswer() {
+        this.playTone(220, 'triangle', 0.2, 0.3);
+        setTimeout(() => this.playTone(180, 'triangle', 0.3, 0.3), 150);
+    }
+}
+
+const AudioPlayer = new SoundEngine();
+
+const GameState = {
+    score: 0, stars: 0,
+    targetCount1: 0, targetCount2: 0,
+    currentFlavor1Placed: 0, currentFlavor2Placed: 0,
+    activeOrderColors: [], activeOrderFlavors: [],
+    
+    addScore(pts) { this.score += pts; document.getElementById('scoreVal').textContent = this.score; },
+    addStar() { this.stars++; document.getElementById('starsVal').textContent = this.stars; }
+};
+
+const playArena = document.getElementById('playArena');
+const scoopsStackContainer = document.getElementById('scoopsStackContainer');
+const orderSpeechBubble = document.getElementById('orderSpeechBubble');
+const mathOverlay = document.getElementById('mathOverlay');
+const mathOptionsGrid = document.getElementById('mathOptionsGrid');
+const feedbackBanner = document.getElementById('feedbackBanner');
+let activeClone = null;
+
+function createNewOrder() {
+    scoopsStackContainer.innerHTML = '';
+    GameState.currentFlavor1Placed = 0;
+    GameState.currentFlavor2Placed = 0;
+    
+    GameState.targetCount1 = Math.floor(Math.random() * 4) + 1;
+    GameState.targetCount2 = Math.floor(Math.random() * 4) + 1;
+    
+    const sources = document.querySelectorAll('.flavor-scoop-source');
+    const source1 = sources[Math.floor(Math.random() * sources.length)];
+    let source2 = sources[Math.floor(Math.random() * sources.length)];
+    while(source1 === source2) { source2 = sources[Math.floor(Math.random() * sources.length)]; }
+
+    GameState.activeOrderColors = [source1.dataset.color, source2.dataset.color];
+    GameState.activeOrderFlavors = [source1.dataset.flavor, source2.dataset.flavor];
+
+    orderSpeechBubble.innerHTML = `🌟 Can you please make a cone with <br> 
+    <span style="color:${source1.dataset.color}">${GameState.targetCount1} ${source1.dataset.flavor}</span> and 
+    <span style="color:${source2.dataset.color}">${GameState.targetCount2} ${source2.dataset.flavor}</span> scoops?`;
+}
+
+function bindDragEvents() {
+    document.querySelectorAll('.flavor-scoop-source').forEach(source => {
+        const onPointerStart = (e) => {
+            e.preventDefault(); AudioPlayer.init();
+            const pointer = e.touches ? e.touches[0] : e;
+            activeClone = document.createElement('div');
+            activeClone.className = 'dragging-clone';
+            activeClone.style.backgroundColor = source.dataset.color;
+            activeClone.dataset.color = source.dataset.color;
+            activeClone.dataset.flavor = source.dataset.flavor;
+            
+            activeClone.style.left = pointer.clientX + 'px';
+            activeClone.style.top = pointer.clientY + 'px';
+            document.body.appendChild(activeClone);
+
+            document.addEventListener('mousemove', onPointerMove);
+            document.addEventListener('touchmove', onPointerMove, { passive: false });
+            document.addEventListener('mouseup', onPointerEnd);
+            document.addEventListener('touchend', onPointerEnd);
+        };
+
+        const onPointerMove = (e) => {
+            if (!activeClone) return;
+            const pointer = e.touches ? e.touches[0] : e;
+            activeClone.style.left = pointer.clientX + 'px';
+            activeClone.style.top = pointer.clientY + 'px';
+        };
+
+        const onPointerEnd = (e) => {
+            if (!activeClone) return;
+            const targetRect = playArena.getBoundingClientRect();
+            const pointer = e.changedTouches ? e.changedTouches[0] : e;
+
+            if (
+                pointer.clientX >= targetRect.left && pointer.clientX <= targetRect.right &&
+                pointer.clientY >= targetRect.top && pointer.clientY <= targetRect.bottom
+            ) {
+                dropScoopOnCone(activeClone.dataset.color, activeClone.dataset.flavor);
+            }
+
+            activeClone.remove(); activeClone = null;
+            document.removeEventListener('mousemove', onPointerMove);
+            document.removeEventListener('touchmove', onPointerMove);
+            document.removeEventListener('mouseup', onPointerEnd);
+            document.removeEventListener('touchend', onPointerEnd);
+        };
+
+        source.addEventListener('mousedown', onPointerStart);
+        source.addEventListener('touchstart', onPointerStart, { passive: false });
+    });
+}
+
+function dropScoopOnCone(colorCode, flavorName) {
+    if (flavorName === GameState.activeOrderFlavors[0]) {
+        if (GameState.currentFlavor1Placed >= GameState.targetCount1) {
+            AudioPlayer.wrongAnswer(); return;
+        }
+        GameState.currentFlavor1Placed++;
+    } else if (flavorName === GameState.activeOrderFlavors[1]) {
+        if (GameState.currentFlavor2Placed >= GameState.targetCount2) {
+            AudioPlayer.wrongAnswer(); return;
+        }
+        GameState.currentFlavor2Placed++;
+    } else {
+        AudioPlayer.wrongAnswer(); return;
+    }
+
+    AudioPlayer.scoopDrop();
+    const newScoop = document.createElement('div');
+    newScoop.className = 'stacked-scoop';
+    newScoop.style.backgroundColor = colorCode;
+    newScoop.style.border = "3px solid rgba(0,0,0,0.08)";
+    scoopsStackContainer.appendChild(newScoop);
+
+    const totalRequired = GameState.targetCount1 + GameState.targetCount2;
+    const currentTotal = GameState.currentFlavor1Placed + GameState.currentFlavor2Placed;
+
+    if (currentTotal === totalRequired) {
+        setTimeout(launchMathPhase, 600);
+    }
+}
+
+function launchMathPhase() {
+    const correctAnswer = GameState.targetCount1 + GameState.targetCount2;
+    document.getElementById('eqLeft').textContent = GameState.targetCount1;
+    document.getElementById('eqRight').textContent = GameState.targetCount2;
+    mathOptionsGrid.innerHTML = ''; feedbackBanner.textContent = '';
+    
+    let answersPool = [correctAnswer];
+    while(answersPool.length < 4) {
+        let fake = Math.floor(Math.random() * 9) + 1;
+        if (!answersPool.includes(fake)) answersPool.push(fake);
+    }
+    answersPool.sort(() => Math.random() - 0.5);
+    
+    answersPool.forEach(ansOption => {
+        const btn = document.createElement('button');
+        btn.className = 'math-btn'; btn.textContent = ansOption;
+        btn.onclick = () => evaluateChoice(ansOption, correctAnswer);
+        mathOptionsGrid.appendChild(btn);
+    });
+    mathOverlay.style.display = 'flex';
+}
+
+function evaluateChoice(chosen, correct) {
+    if (chosen === correct) {
+        AudioPlayer.correctAnswer();
+        feedbackBanner.style.color = '#2ecc71';
+        feedbackBanner.textContent = '🎉 Incredible! That is Correct! 🌟';
+        GameState.addScore(10); GameState.addStar(); spawnConfettiEffects();
+        setTimeout(() => { mathOverlay.style.display = 'none'; createNewOrder(); }, 1600);
+    } else {
+        AudioPlayer.wrongAnswer();
+        feedbackBanner.style.color = '#e74c3c';
+        feedbackBanner.textContent = '❌ Nice try! Count again! 👍';
+    }
+}
+
+function spawnConfettiEffects() {
+    const colors = ['#ff7675', '#74b9ff', '#55efc4', '#ffeaa7', '#9b59b6'];
+    for(let i=0; i<30; i++) {
+        const p = document.createElement('div'); p.className = 'confetti';
+        p.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+        p.style.left = (Math.random() * 100) + 'vw'; p.style.top = '-20px';
+        p.style.width = (Math.random() * 8 + 6) + 'px'; p.style.height = p.style.width;
+        p.style.animationDuration = (Math.random() * 1.5 + 1) + 's';
+        document.body.appendChild(p); setTimeout(() => p.remove(), 2500);
+    }
+}
+
+document.getElementById('playButton').onclick = () => {
+    AudioPlayer.init();
+    document.getElementById('splashScreen').style.setProperty('display', 'none');
+    createNewOrder(); bindDragEvents();
+};
+
+// Full Screen Native Request Handler Activation Link
+document.getElementById('fullscreenToggle').onclick = () => {
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => {
+            console.log(`Error moving into fullscreen context: ${err.message}`);
+        });
+    } else {
+        document.exitFullscreen();
+    }
+};
+</script>
+</body>
+</html>

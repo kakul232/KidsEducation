@@ -13,6 +13,17 @@ export interface Student {
   userAgent?: string;
   browser?: string;
   deviceType?: string;
+  age?: number;
+  class?: string;
+  phone?: string;
+  validUntil?: string;
+}
+
+export interface AttemptDetail {
+  question: string;
+  answer: string;
+  success: boolean;
+  timestamp: string;
 }
 
 export interface ActivityLog {
@@ -32,6 +43,11 @@ export interface ActivityLog {
   rewardEarned: string; // e.g. "⭐ Star"
   device: string;
   browser: string;
+  ip?: string;
+  deviceId?: string;
+  userAgent?: string;
+  deviceType?: string;
+  attemptsHistory?: AttemptDetail[];
 }
 
 export interface Game {

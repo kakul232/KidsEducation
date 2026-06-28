@@ -17,12 +17,26 @@ const DIFFICULTY_SYMBOLS: Record<string, { symbol: string; label: string; color:
   Hard: { symbol: "🌳", label: "Big Tree", color: "#b91c1c", bg: "#fee2e2" }
 };
 
+const parseGameTitle = (fullTitle: string) => {
+  const emojiRegex = /^([\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F000}-\u{1F02F}]|[\u{1F0A0}-\u{1F0FF}]|[\u{1F100}-\u{1F64F}]|[\u{1F680}-\u{1F6FF}]|[\u{1F900}-\u{1F9FF}]|[\u{1FA00}-\u{1FAFF}]|[\u{2000}-\u{3300}])/u;
+  const trimmed = fullTitle.trim();
+  const match = trimmed.match(emojiRegex);
+  if (match) {
+    const emoji = match[1];
+    const rest = trimmed.substring(emoji.length).trim();
+    return { emoji, cleanTitle: rest };
+  }
+  return { emoji: "🎮", cleanTitle: trimmed };
+};
+
 export const Dashboard: React.FC = () => {
   const { currentStudent, setPlayingGame } = useApp();
   const [games, setGames] = useState<Game[]>([]);
   const [selectedSubject, setSelectedSubject] = useState("math");
   const [completedGames, setCompletedGames] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(LocalDB.getCachedGames().length === 0);
+  const [viewMode, setViewMode] = useState<"list" | "grid">("grid");
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
 
   useEffect(() => {
     // 1. Helper to render games & logs from a given data set
@@ -107,6 +121,71 @@ export const Dashboard: React.FC = () => {
     }
   };
 
+  // Check student validity expiration
+  const isExpired = currentStudent?.validUntil && new Date() > new Date(currentStudent.validUntil);
+
+  if (isExpired && currentStudent) {
+    return (
+      <div className="container animate-slide-up" style={{ justifyContent: "center", minHeight: "100vh", padding: "20px" }}>
+        <PlayCard
+          style={{
+            maxWidth: "400px",
+            width: "100%",
+            textAlign: "center",
+            padding: "40px 24px",
+            border: "4px solid var(--accent-primary)",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "24px"
+          }}
+        >
+          <div style={{ fontSize: "4.5rem" }}>⏰</div>
+          <h2 style={{ fontSize: "1.8rem", fontWeight: "900", color: "var(--text-primary)", margin: 0 }}>
+            Time to Renew! 🌟
+          </h2>
+          <p style={{ color: "var(--text-secondary)", fontWeight: "700", fontSize: "1.05rem", margin: 0, lineHeight: "1.5" }}>
+            Hi {currentStudent.name}! Your learning dashboard validity has ended. 
+            Please ask your parents or teacher to renew it so you can keep playing and earning stars!
+          </p>
+
+          <div
+            style={{
+              backgroundColor: "var(--bg-primary)",
+              border: "2px dashed #cbd5e1",
+              borderRadius: "16px",
+              padding: "16px",
+              width: "100%",
+              fontSize: "0.95rem",
+              textAlign: "left"
+            }}
+          >
+            <p style={{ margin: "4px 0" }}><strong>Registered Phone:</strong> {currentStudent.phone || "N/A"}</p>
+            <p style={{ margin: "4px 0" }}><strong>Student ID:</strong> <span style={{ fontFamily: "monospace" }}>{currentStudent.id}</span></p>
+          </div>
+
+          <button
+            onClick={handleStudentLogOut}
+            className="btn"
+            style={{
+              width: "100%",
+              padding: "12px",
+              fontSize: "1rem",
+              backgroundColor: "#fee2e2",
+              border: "2px solid #fca5a5",
+              color: "#b91c1c",
+              borderRadius: "12px",
+              fontWeight: "800",
+              cursor: "pointer"
+            }}
+          >
+            🚪 Change Account
+          </button>
+        </PlayCard>
+      </div>
+    );
+  }
+
   return (
     <div className="container animate-slide-up">
       {isLoading && <KidsLoader />}
@@ -175,12 +254,46 @@ export const Dashboard: React.FC = () => {
         ))}
       </div>
 
-      {/* Games List for Subject */}
-      <h3 style={{ fontSize: "1.3rem", marginBottom: "16px", color: "var(--text-primary)" }}>
-        Choose a Game:
-      </h3>
+      {/* Games List for Subject with list/grid toggle */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+        <h3 style={{ fontSize: "1.3rem", color: "var(--text-primary)", margin: 0 }}>
+          Choose a Game:
+        </h3>
+        <div style={{ display: "flex", gap: "6px" }}>
+          <button
+            onClick={() => setViewMode("list")}
+            style={{
+              padding: "6px 12px",
+              fontSize: "0.8rem",
+              borderRadius: "10px",
+              border: "2px solid #cbd5e1",
+              backgroundColor: viewMode === "list" ? "var(--accent-primary)" : "var(--bg-secondary)",
+              color: viewMode === "list" ? "#ffffff" : "var(--text-primary)",
+              fontWeight: "800",
+              cursor: "pointer"
+            }}
+          >
+            📋 List
+          </button>
+          <button
+            onClick={() => setViewMode("grid")}
+            style={{
+              padding: "6px 12px",
+              fontSize: "0.8rem",
+              borderRadius: "10px",
+              border: "2px solid #cbd5e1",
+              backgroundColor: viewMode === "grid" ? "var(--accent-primary)" : "var(--bg-secondary)",
+              color: viewMode === "grid" ? "#ffffff" : "var(--text-primary)",
+              fontWeight: "800",
+              cursor: "pointer"
+            }}
+          >
+            🎛️ Grid
+          </button>
+        </div>
+      </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: "16px", flex: 1 }}>
+      <div style={{ flex: 1 }}>
         {games.length === 0 ? (
           <PlayCard style={{ textAlign: "center", padding: "40px 20px", border: "2px dashed #cbd5e1" }}>
             <Trophy size={48} color="#94a3b8" style={{ marginBottom: "12px" }} />
@@ -189,146 +302,258 @@ export const Dashboard: React.FC = () => {
             </p>
           </PlayCard>
         ) : (
-          games.map(game => (
-            <PlayCard
-              key={game.id}
-              onClick={() => setPlayingGame(game)}
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                backgroundColor: completedGames[game.id] ? "#f0fdf4" : "var(--bg-secondary)",
-                borderColor: completedGames[game.id] ? "#86efac" : "#e2e8f0",
-                borderWidth: "3px",
-                borderStyle: "solid",
-                boxShadow: "0 6px 0 rgba(0,0,0,0.05)",
-                padding: "20px"
-              }}
-            >
-              <div>
-                <span
+          <div
+            style={
+              viewMode === "list"
+                ? { display: "flex", flexDirection: "column", gap: "16px" }
+                : { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "16px" }
+            }
+          >
+            {games.map(game => {
+              const { emoji, cleanTitle } = parseGameTitle(game.title);
+              return (
+                <PlayCard
+                  key={game.id}
+                  onClick={() => setPlayingGame(game)}
                   style={{
-                    fontSize: "1.2rem",
-                    fontWeight: "800",
                     display: "flex",
-                    alignItems: "center",
-                    color: "var(--text-primary)",
-                    wordSpacing: "0.1em"
+                    flexDirection: viewMode === "list" ? "row" : "column",
+                    alignItems: viewMode === "list" ? "center" : "stretch",
+                    backgroundColor: completedGames[game.id] ? "#f0fdf4" : "var(--bg-secondary)",
+                    borderColor: completedGames[game.id] ? "#86efac" : "#e2e8f0",
+                    borderWidth: "3px",
+                    borderStyle: "solid",
+                    boxShadow: "0 6px 0 rgba(0,0,0,0.05)",
+                    padding: viewMode === "list" ? "16px 20px" : "20px 16px",
+                    gap: "16px",
+                    cursor: "pointer"
                   }}
                 >
-                  {game.title}
-                  
-                  {/* Animated NEW Tag for newly published games */}
-                  {isNew(game.createdAt) && (
-                    <span
-                      className="animate-tag-pulse"
-                      style={{
-                        fontSize: "0.75rem",
-                        backgroundColor: "#f43f5e",
-                        color: "#ffffff",
-                        padding: "2px 8px",
-                        borderRadius: "8px",
-                        fontWeight: "900",
-                        letterSpacing: "0.05em",
-                        marginLeft: "10px",
-                        lineHeight: "1"
-                      }}
-                    >
-                      NEW
-                    </span>
-                  )}
-                </span>
-                <div style={{ display: "flex", gap: "8px", marginTop: "8px", flexWrap: "wrap" }}>
-                  <span
+                  {/* Big Game Logo */}
+                  <div
                     style={{
-                      fontSize: "0.8rem",
-                      backgroundColor: "var(--bg-primary)",
-                      padding: "4px 10px",
-                      borderRadius: "10px",
-                      fontWeight: "700",
-                      color: "var(--text-secondary)"
+                      fontSize: viewMode === "list" ? "2.2rem" : "2.8rem",
+                      width: viewMode === "list" ? "60px" : "80px",
+                      height: viewMode === "list" ? "60px" : "80px",
+                      minWidth: viewMode === "list" ? "60px" : "80px",
+                      borderRadius: viewMode === "list" ? "16px" : "22px",
+                      backgroundColor: completedGames[game.id] ? "#d1fae5" : "var(--bg-primary)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      boxShadow: "inset 0 -4px 0 rgba(0,0,0,0.05)",
+                      margin: viewMode === "list" ? "0" : "0 auto 8px auto",
+                      alignSelf: "center"
                     }}
                   >
-                    Topic: {game.topic}
-                  </span>
-                  {(() => {
-                    const diff = DIFFICULTY_SYMBOLS[game.difficulty] || DIFFICULTY_SYMBOLS.Easy;
-                    return (
-                      <span
-                        style={{
-                          fontSize: "0.8rem",
-                          backgroundColor: diff.bg,
-                          color: diff.color,
-                          padding: "4px 10px",
-                          borderRadius: "10px",
-                          fontWeight: "800",
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "4px"
-                        }}
-                      >
-                        <span>{diff.symbol}</span>
-                        <span>{diff.label}</span>
-                      </span>
-                    );
-                  })()}
+                    {emoji}
+                  </div>
 
-                  {/* Completed star rewards indicator */}
-                  {completedGames[game.id] && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "8px", flex: 1, textAlign: viewMode === "list" ? "left" : "center" }}>
                     <span
                       style={{
-                        fontSize: "0.8rem",
-                        backgroundColor: "#d1fae5",
-                        color: "#065f46",
-                        padding: "4px 10px",
-                        borderRadius: "10px",
+                        fontSize: viewMode === "list" ? "1.2rem" : "1.05rem",
                         fontWeight: "800",
-                        display: "inline-flex",
+                        display: "flex",
+                        flexDirection: viewMode === "list" ? "row" : "column",
                         alignItems: "center",
-                        gap: "4px"
+                        justifyContent: viewMode === "list" ? "flex-start" : "center",
+                        flexWrap: "wrap",
+                        color: "var(--text-primary)",
+                        wordSpacing: "0.1em",
+                        lineHeight: "1.2"
                       }}
                     >
-                      ✓ Done ({completedGames[game.id]})
+                      <span>{cleanTitle}</span>
+                      
+                      {/* Animated NEW Tag for newly published games, hiding if completed */}
+                      {isNew(game.createdAt) && !completedGames[game.id] && (
+                        <span
+                          className="animate-tag-pulse"
+                          style={{
+                            fontSize: "0.75rem",
+                            backgroundColor: "#f43f5e",
+                            color: "#ffffff",
+                            padding: "2px 8px",
+                            borderRadius: "8px",
+                            fontWeight: "900",
+                            letterSpacing: "0.05em",
+                            marginLeft: viewMode === "list" ? "10px" : "0",
+                            marginTop: viewMode === "list" ? "0" : "6px",
+                            lineHeight: "1"
+                          }}
+                        >
+                          NEW
+                        </span>
+                      )}
                     </span>
-                  )}
-                </div>
-              </div>
+                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", justifyContent: viewMode === "list" ? "flex-start" : "center" }}>
+                      {(() => {
+                        const diff = DIFFICULTY_SYMBOLS[game.difficulty] || DIFFICULTY_SYMBOLS.Easy;
+                        return (
+                          <span
+                            style={{
+                              fontSize: "0.8rem",
+                              backgroundColor: diff.bg,
+                              color: diff.color,
+                              padding: "4px 10px",
+                              borderRadius: "10px",
+                              fontWeight: "800",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "4px"
+                            }}
+                          >
+                            <span>{diff.symbol}</span>
+                            <span>{diff.label}</span>
+                          </span>
+                        );
+                      })()}
 
-              <div
-                style={{
-                  backgroundColor: "var(--accent-primary)",
-                  color: "#fff",
-                  borderRadius: "50%",
-                  width: "48px",
-                  height: "48px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  boxShadow: "0 6px 12px rgba(79, 70, 229, 0.3)"
-                }}
-              >
-                <Play size={20} fill="#fff" />
-              </div>
-            </PlayCard>
-          ))
+                      {/* Completed star rewards indicator */}
+                      {completedGames[game.id] && (
+                        <span
+                          style={{
+                            fontSize: "0.8rem",
+                            backgroundColor: "#d1fae5",
+                            color: "#065f46",
+                            padding: "4px 10px",
+                            borderRadius: "10px",
+                            fontWeight: "800",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "4px"
+                          }}
+                        >
+                          ✓ Done ({completedGames[game.id]})
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: viewMode === "list" ? "flex-end" : "center",
+                      alignItems: "center",
+                      marginTop: viewMode === "list" ? 0 : "8px"
+                    }}
+                  >
+                    <div
+                      style={{
+                        backgroundColor: "var(--accent-primary)",
+                        color: "#fff",
+                        borderRadius: "50%",
+                        width: "48px",
+                        height: "48px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        boxShadow: "0 6px 12px rgba(79, 70, 229, 0.3)"
+                      }}
+                    >
+                      <Play size={20} fill="#fff" />
+                    </div>
+                  </div>
+                </PlayCard>
+              );
+            })}
+          </div>
         )}
       </div>
 
-      {/* Exit Dashboard using Reusable ChunkyButton */}
-      <ChunkyButton
-        onClick={handleStudentLogOut}
-        variant="gray"
-        style={{
-          marginTop: "24px",
-          padding: "12px 24px",
-          fontSize: "0.95rem",
-          boxShadow: "none",
-          alignSelf: "center"
-        }}
-      >
-        <LogOut size={16} />
-        Exit Account
-      </ChunkyButton>
+      {/* Exit Dashboard using kids-friendly exit door */}
+      <div style={{ display: "flex", justifyContent: "center", marginTop: "28px", marginBottom: "10px" }}>
+        <button
+          onClick={() => setShowExitConfirm(true)}
+          style={{
+            width: "55px",
+            height: "55px",
+            borderRadius: "50%",
+            backgroundColor: "#fee2e2",
+            border: "4px solid #fca5a5",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: "1.7rem",
+            cursor: "pointer",
+            boxShadow: "0 6px 0 #ef4444",
+            outline: "none"
+          }}
+          title="Exit Account"
+        >
+          🚪
+        </button>
+      </div>
+
+      {/* Accidental Log-out protection modal */}
+      {showExitConfirm && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(15, 23, 42, 0.4)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+            padding: "20px",
+            backdropFilter: "blur(5px)"
+          }}
+        >
+          <PlayCard
+            style={{
+              maxWidth: "350px",
+              width: "100%",
+              textAlign: "center",
+              padding: "28px 24px",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "20px",
+              backgroundColor: "var(--bg-secondary)",
+              border: "4px solid var(--accent-primary)"
+            }}
+          >
+            <div style={{ fontSize: "3.5rem", animation: "bounce 2s infinite" }}>🚪</div>
+            <h3 style={{ fontSize: "1.45rem", fontWeight: "900", color: "var(--text-primary)", margin: 0 }}>
+              Are you leaving?
+            </h3>
+            <p style={{ color: "var(--text-secondary)", fontWeight: "700", fontSize: "0.95rem", margin: 0, lineHeight: "1.4" }}>
+              Do you really want to close your dashboard and exit?
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px", width: "100%" }}>
+              <button
+                onClick={() => setShowExitConfirm(false)}
+                className="btn btn-success"
+                style={{ width: "100%", padding: "14px", fontSize: "1.1rem", fontWeight: "800", boxShadow: "0 4px 0 #16a34a" }}
+              >
+                🎮 Keep Playing!
+              </button>
+              <button
+                onClick={handleStudentLogOut}
+                style={{
+                  width: "100%",
+                  padding: "10px",
+                  fontSize: "0.85rem",
+                  backgroundColor: "#fee2e2",
+                  border: "2px solid #fca5a5",
+                  color: "#b91c1c",
+                  borderRadius: "12px",
+                  fontWeight: "800",
+                  cursor: "pointer",
+                  marginTop: "8px"
+                }}
+              >
+                🚪 Yes, Exit
+              </button>
+            </div>
+          </PlayCard>
+        </div>
+      )}
     </div>
   );
 };

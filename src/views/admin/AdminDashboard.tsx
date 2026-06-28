@@ -21,6 +21,29 @@ import {
   EyeOff
 } from "lucide-react";
 
+const THEME_PRESETS = {
+  space: {
+    name: "Space Voyage 🌌",
+    prompt: "Use space travel theme, include colorful floating planets, count visual stars, astronaut guidance."
+  },
+  ocean: {
+    name: "Deep Sea 🐠",
+    prompt: "Deep sea background with colorful fish swimming, pop oxygen bubbles to count, submarine guidance."
+  },
+  dino: {
+    name: "Dino World 🦖",
+    prompt: "Dinosaur footprints and jungle theme, match correct counts to feed food to a happy baby T-Rex."
+  },
+  candy: {
+    name: "Candy Land 🍬",
+    prompt: "Delicious sweet candies and cupcakes theme, stack sweets or pop candy drops to answer math challenges."
+  },
+  custom: {
+    name: "Custom Theme 🪄",
+    prompt: ""
+  }
+};
+
 export const AdminDashboard: React.FC = () => {
   const {
     isAdminLoggedIn,
@@ -50,17 +73,22 @@ export const AdminDashboard: React.FC = () => {
   const [age, setAge] = useState(5);
   const [difficulty, setDifficulty] = useState<"Easy" | "Medium" | "Hard">("Easy");
   const [assignedStudentId, setAssignedStudentId] = useState("");
-  const [gameInstruction, setGameInstruction] = useState("");
+  const [gameInstruction, setGameInstruction] = useState("Use space travel theme, include colorful floating planets, count visual stars, astronaut guidance.");
+  const [aiTheme, setAiTheme] = useState<"space" | "ocean" | "dino" | "candy" | "custom">("space");
+  const [includeSound, setIncludeSound] = useState(true);
+  const [rounds, setRounds] = useState<number | "infinite">(5);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [isDataLoading, setIsDataLoading] = useState(false);
   const [generatedGame, setGeneratedGame] = useState<GeneratedGameResponse | null>(null);
   const [generationError, setGenerationError] = useState("");
   const [editingGameId, setEditingGameId] = useState<string | null>(null);
+  const [tweakInstruction, setTweakInstruction] = useState("");
   
   // Custom edit state for draft code
   const [draftCode, setDraftCode] = useState("");
   const [codeEditMode, setCodeEditMode] = useState(false);
+  const [selectedDetailLog, setSelectedDetailLog] = useState<ActivityLog | null>(null);
 
   // Settings
   const [apiKeyInput, setApiKeyInput] = useState(geminiApiKey);
@@ -97,6 +125,29 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
+  const handleExtendValidity = async (studentId: string) => {
+    try {
+      const student = students.find(s => s.id === studentId);
+      if (!student) return;
+
+      const currentExp = student.validUntil ? new Date(student.validUntil) : new Date();
+      const baseDate = currentExp > new Date() ? currentExp : new Date();
+      const newExp = new Date(baseDate.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+      const updatedStudent = {
+        ...student,
+        validUntil: newExp
+      };
+
+      await LocalDB.saveStudent(updatedStudent);
+      alert(`Extended validity for ${student.name} by +1 Month!\nNew Expiry: ${new Date(newExp).toLocaleDateString()}`);
+      loadData();
+    } catch (e) {
+      console.error("Failed to extend validity:", e);
+      alert("Error extending student validity.");
+    }
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
@@ -117,6 +168,24 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
+  const handleThemeChange = (themeKey: "space" | "ocean" | "dino" | "candy" | "custom") => {
+    setAiTheme(themeKey);
+    if (themeKey !== "custom") {
+      setGameInstruction(THEME_PRESETS[themeKey].prompt);
+    } else {
+      setGameInstruction("");
+    }
+  };
+
+  const handleAppendInstruction = (text: string) => {
+    setGameInstruction(prev => {
+      const cleanPrev = prev.trim();
+      if (!cleanPrev) return text;
+      if (cleanPrev.toLowerCase().includes(text.toLowerCase())) return prev;
+      return cleanPrev + ", " + text;
+    });
+  };
+
   // AI Generator trigger
   const handleGenerate = async () => {
     if (!topic.trim()) return;
@@ -125,13 +194,57 @@ export const AdminDashboard: React.FC = () => {
     setGenerationError("");
     setCodeEditMode(false);
 
+    // Build the final combined AI instructions
+    const combinedInstructions = [
+      `Theme/Style: ${THEME_PRESETS[aiTheme].name}`,
+      includeSound ? "Include visual audio feedback using HTML5 Web Audio API (AudioContext synth chimes) for correct and incorrect answers." : "Visual only feedback, do not write audio codes.",
+      gameInstruction.trim()
+    ].filter(Boolean).join("\n• ");
+
     try {
-      const result = await generateGame(subject, topic, age, difficulty, geminiApiKey, gameInstruction);
+      const result = await generateGame(subject, topic, age, difficulty, geminiApiKey, combinedInstructions, rounds);
       setGeneratedGame(result);
       setDraftCode(result.htmlContent);
     } catch (err: any) {
       console.error(err);
       setGenerationError(err.message || "Gemini AI generation failed. Verify API key and network.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleTitleChange = (newTitle: string) => {
+    if (!generatedGame) return;
+    setGeneratedGame({
+      ...generatedGame,
+      title: newTitle
+    });
+  };
+
+  const handleClearHtml = () => {
+    setDraftCode("");
+  };
+
+  const handleRegenerate = async () => {
+    if (!tweakInstruction.trim() || !generatedGame) return;
+    setIsGenerating(true);
+    setGenerationError("");
+
+    const modifyInstructions = [
+      `Theme/Style: ${THEME_PRESETS[aiTheme].name}`,
+      includeSound ? "Include visual audio feedback using HTML5 Web Audio API (AudioContext synth chimes) for correct and incorrect answers." : "Visual only feedback, do not write audio codes.",
+      gameInstruction.trim() ? `Base instructions: ${gameInstruction.trim()}` : "",
+      `REGENERATION REQUEST: Modify the existing HTML code according to this custom request: "${tweakInstruction.trim()}". Keep the rest of the game structures, logic, and sounds unchanged.`
+    ].filter(Boolean).join("\n• ");
+
+    try {
+      const result = await generateGame(subject, topic, age, difficulty, geminiApiKey, modifyInstructions, rounds, draftCode);
+      setGeneratedGame(result);
+      setDraftCode(result.htmlContent);
+      setTweakInstruction("");
+    } catch (err: any) {
+      console.error(err);
+      setGenerationError(err.message || "Gemini AI regeneration failed.");
     } finally {
       setIsGenerating(false);
     }
@@ -331,27 +444,16 @@ export const AdminDashboard: React.FC = () => {
 
   // Render Admin Dashboard layout
   return (
-    <div style={{ width: "100%", maxWidth: "800px", margin: "0 auto", padding: "24px" }} className="animate-slide-up">
+    <div className="admin-container animate-slide-up">
       {(isGenerating || isDataLoading) && <KidsLoader />}
       
       {/* Admin Header */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "24px",
-          backgroundColor: "#fff",
-          borderRadius: "20px",
-          padding: "16px 24px",
-          boxShadow: "var(--card-shadow)"
-        }}
-      >
+      <div className="admin-header">
         <div>
           <h1 style={{ fontSize: "1.4rem", color: "var(--text-primary)" }}>🏫 Educator Dashboard</h1>
           <span style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>School Management & AI Studio</span>
         </div>
-        <div style={{ display: "flex", gap: "10px" }}>
+        <div className="admin-header-actions">
           <button
             onClick={() => setView("onboarding")}
             className="btn btn-gray"
@@ -412,7 +514,7 @@ export const AdminDashboard: React.FC = () => {
         {/* TAB 1: OVERVIEW STATS */}
         {activeTab === "stats" && (
           <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "16px" }}>
+            <div className="admin-stats-grid">
               <div className="play-card" style={{ textAlign: "center" }}>
                 <span style={{ fontSize: "2rem", fontWeight: "800", color: "var(--accent-primary)" }}>
                   {students.length}
@@ -445,22 +547,51 @@ export const AdminDashboard: React.FC = () => {
               {students.length === 0 ? (
                 <p style={{ color: "var(--text-secondary)", fontSize: "0.95rem" }}>No students registered yet.</p>
               ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                  {students.map(std => (
-                    <div
-                      key={std.id}
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        padding: "12px",
-                        backgroundColor: "var(--bg-primary)",
-                        borderRadius: "12px"
-                      }}
-                    >
-                      <span style={{ fontWeight: "700" }}>{std.name}</span>
-                      <span style={{ color: "#c2410c", fontWeight: "700" }}>⭐ {std.stars} Stars</span>
-                    </div>
-                  ))}
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  {students.map(std => {
+                    const isExpired = std.validUntil && new Date() > new Date(std.validUntil);
+                    return (
+                      <div
+                        key={std.id}
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          padding: "12px 16px",
+                          backgroundColor: "var(--bg-primary)",
+                          borderRadius: "12px",
+                          border: "1px solid #cbd5e1"
+                        }}
+                      >
+                        <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+                          <span style={{ fontWeight: "700", fontSize: "1rem" }}>{std.name}</span>
+                          <span style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>
+                            Age: {std.age || "N/A"} | Class: {std.class || "N/A"} | Phone: {std.phone || "N/A"}
+                          </span>
+                          <span style={{ fontSize: "0.8rem", color: isExpired ? "#ef4444" : "#10b981", fontWeight: "800" }}>
+                            {isExpired ? "⏰ Expired" : "✓ Active"} (Expires: {std.validUntil ? new Date(std.validUntil).toLocaleDateString() : "Never"})
+                          </span>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                          <span style={{ color: "#c2410c", fontWeight: "800", fontSize: "0.95rem" }}>⭐ {std.stars} Stars</span>
+                          <button
+                            onClick={() => handleExtendValidity(std.id)}
+                            className="btn btn-success"
+                            style={{
+                              padding: "6px 12px",
+                              fontSize: "0.75rem",
+                              boxShadow: "none",
+                              backgroundColor: "#d1fae5",
+                              border: "1.5px solid #10b981",
+                              color: "#065f46"
+                            }}
+                          >
+                            ➕ Renew +1 Mo
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -469,35 +600,39 @@ export const AdminDashboard: React.FC = () => {
 
         {/* TAB 2: AI STUDIO (GAME GENERATION) */}
         {activeTab === "studio" && (
-          <div className="play-card" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <h3 style={{ fontSize: "1.2rem", color: "var(--text-primary)" }}>
-                  {editingGameId ? `✏️ Editing Game: ${generatedGame?.title}` : "Generate Interactive Activity"}
+          <div className="play-card" style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+            
+            {/* Sparkling AI Header Banner */}
+            <div className="ai-studio-header">
+              <div>
+                <h3 style={{ fontSize: "1.3rem", color: "#fff", display: "flex", alignItems: "center", gap: "8px" }}>
+                  🪄 Gemini AI Studio
                 </h3>
-                {editingGameId && (
-                  <button
-                    onClick={handleCancelEdit}
-                    className="btn"
-                    style={{
-                      padding: "6px 12px",
-                      backgroundColor: "#f1f5f9",
-                      border: "2px solid #cbd5e1",
-                      borderRadius: "10px",
-                      fontSize: "0.8rem",
-                      boxShadow: "none"
-                    }}
-                  >
-                    Cancel Edit
-                  </button>
-                )}
+                <p style={{ fontSize: "0.85rem", color: "rgba(255, 255, 255, 0.9)", marginTop: "4px" }}>
+                  {editingGameId ? "Modify and re-generate existing game details." : "Co-create visual, dyslexia-accessible arithmetic activities using Gemini AI."}
+                </p>
               </div>
-              <p style={{ fontSize: "0.9rem", color: "var(--text-secondary)", marginTop: "4px" }}>
-                {editingGameId ? "Modify code below or tweak instructions and re-generate." : "Uses Gemini to output accessibly structured, dyslexia-friendly arithmetic HTML5 games."}
-              </p>
+              {editingGameId && (
+                <button
+                  onClick={handleCancelEdit}
+                  className="btn"
+                  style={{
+                    padding: "8px 14px",
+                    backgroundColor: "rgba(255, 255, 255, 0.2)",
+                    border: "1.5px solid rgba(255, 255, 255, 0.4)",
+                    color: "#fff",
+                    borderRadius: "10px",
+                    fontSize: "0.8rem",
+                    boxShadow: "none"
+                  }}
+                >
+                  Cancel Edit
+                </button>
+              )}
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "16px" }}>
+            {/* AI Setup options Grid */}
+            <div className="admin-form-grid">
               <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                 <label htmlFor="student-selector-studio" style={{ fontWeight: "700", fontSize: "0.9rem" }}>Select Student</label>
                 <select
@@ -556,19 +691,118 @@ export const AdminDashboard: React.FC = () => {
                 </select>
               </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: "6px", gridColumn: "span 2" }}>
-                <label htmlFor="instruction-input-studio" style={{ fontWeight: "700", fontSize: "0.9rem" }}>Optional Game Instructions (AI prompt helper)</label>
-                <textarea
-                  id="instruction-input-studio"
-                  rows={3}
-                  placeholder="e.g. Use space travel theme, include colorful planets, make it easy to count visual dots..."
-                  value={gameInstruction}
-                  onChange={e => setGameInstruction(e.target.value)}
-                  style={{ padding: "12px", borderRadius: "10px", border: "2px solid #cbd5e1", resize: "vertical" }}
-                />
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                <label htmlFor="rounds-selector-studio" style={{ fontWeight: "700", fontSize: "0.9rem" }}>Rounds Limit</label>
+                <select
+                  id="rounds-selector-studio"
+                  value={rounds}
+                  onChange={e => setRounds(e.target.value === "infinite" ? "infinite" : Number(e.target.value))}
+                  style={{ padding: "12px", borderRadius: "10px", border: "2px solid #cbd5e1" }}
+                >
+                  <option value={1}>1 Round</option>
+                  <option value={2}>2 Rounds</option>
+                  <option value={3}>3 Rounds</option>
+                  <option value={4}>4 Rounds</option>
+                  <option value={5}>5 Rounds (Recommended)</option>
+                  <option value={6}>6 Rounds</option>
+                  <option value={7}>7 Rounds</option>
+                  <option value={8}>8 Rounds</option>
+                  <option value={9}>9 Rounds</option>
+                  <option value={10}>10 Rounds</option>
+                  <option value="infinite">Infinite Rounds ♾️</option>
+                </select>
               </div>
             </div>
 
+            {/* AI Theme Presets Selector */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              <span style={{ fontWeight: "700", fontSize: "0.95rem" }}>🎨 Select Game Creative Theme (AI Preset)</span>
+              <div className="ai-theme-grid">
+                {(Object.keys(THEME_PRESETS) as Array<keyof typeof THEME_PRESETS>).map((key) => {
+                  const preset = THEME_PRESETS[key];
+                  const emojis: Record<string, string> = { space: "🌌", ocean: "🐠", dino: "🦖", candy: "🍬", custom: "🪄" };
+                  return (
+                    <div
+                      key={key}
+                      onClick={() => handleThemeChange(key)}
+                      className={`ai-theme-card ${aiTheme === key ? "active" : ""}`}
+                    >
+                      <span className="icon">{emojis[key]}</span>
+                      <span className="title">{preset.name.split(" ")[0]}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Custom AI Instructions Box */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+              <label htmlFor="instruction-input-studio" style={{ fontWeight: "700", fontSize: "0.95rem" }}>
+                📝 Custom AI Prompts & Directives
+              </label>
+              <textarea
+                id="instruction-input-studio"
+                rows={3}
+                placeholder="Describe custom graphics, theme accents, or select quick suggestion pills below..."
+                value={gameInstruction}
+                onChange={e => setGameInstruction(e.target.value)}
+                style={{ padding: "12px", borderRadius: "10px", border: "2px solid #cbd5e1", resize: "vertical" }}
+              />
+              
+              {/* Quick Click Suggestion Pills */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "4px", marginTop: "4px" }}>
+                <span style={{ fontSize: "0.75rem", fontWeight: "700", color: "var(--text-secondary)" }}>
+                  💡 Click to add specific directives to the prompt:
+                </span>
+                <div className="ai-pills-container">
+                  <button type="button" className="ai-pill" onClick={() => handleAppendInstruction("large chunky buttons")}>
+                    🔘 Chunky Buttons
+                  </button>
+                  <button type="button" className="ai-pill" onClick={() => handleAppendInstruction("direct canvas touch gestures")}>
+                    👈 Touch/Swipe Controls
+                  </button>
+                  <button type="button" className="ai-pill" onClick={() => handleAppendInstruction("dyslexia-friendly high contrast colors")}>
+                    👁️ Dyslexia Colors
+                  </button>
+                  <button type="button" className="ai-pill" onClick={() => handleAppendInstruction("synthesizer chime sounds")}>
+                    🔊 Audio Synthesis
+                  </button>
+                  <button type="button" className="ai-pill" onClick={() => handleAppendInstruction("celebrative confetti animations")}>
+                    🎉 Confetti FX
+                  </button>
+                  <button type="button" className="ai-pill" onClick={() => handleAppendInstruction("visual items instead of dots")}>
+                    🎨 Visual Icons
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Audio Feedback option */}
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", backgroundColor: "#f8fafc", padding: "12px 18px", borderRadius: "16px", border: "1px solid #cbd5e1" }}>
+              <input
+                id="audio-toggle-studio"
+                type="checkbox"
+                checked={includeSound}
+                onChange={e => setIncludeSound(e.target.checked)}
+                style={{ width: "20px", height: "20px", cursor: "pointer" }}
+              />
+              <label htmlFor="audio-toggle-studio" style={{ fontWeight: "700", fontSize: "0.9rem", cursor: "pointer" }}>
+                🔊 Prompt AI to write HTML5 Audio Synth Feedback (Plays sounds on answers)
+              </label>
+            </div>
+
+            {/* Prompt Preview */}
+            <div style={{ padding: "14px", borderRadius: "16px", backgroundColor: "#f0fdfa", border: "1.5px solid #5eead4", fontSize: "0.8rem", display: "flex", flexDirection: "column", gap: "6px" }}>
+              <span style={{ fontWeight: "700", color: "#0f766e" }}>💡 Structured Guidelines Sent to AI model:</span>
+              <div style={{ color: "#0f766e", lineHeight: "1.4", fontFamily: "monospace", whiteSpace: "pre-wrap" }}>
+                • Theme/Style: {THEME_PRESETS[aiTheme].name}
+                {"\n"}• Rounds: {rounds === "infinite" ? "Infinite loop of tasks (Continuous Play)" : `${rounds} Round(s) Limit`}
+                {"\n"}• {includeSound ? "Include HTML5 Web Audio synth feedback tone generator." : "Visual only feedback, do not write audio codes."}
+                {gameInstruction.trim() && `\n• ${gameInstruction.trim()}`}
+              </div>
+            </div>
+
+            {/* Action Trigger button */}
             <button
               onClick={handleGenerate}
               disabled={isGenerating}
@@ -612,24 +846,42 @@ export const AdminDashboard: React.FC = () => {
                   gap: "20px"
                 }}
               >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <h4 style={{ fontSize: "1.1rem" }}>Result: {generatedGame.title}</h4>
-                  <div style={{ display: "flex", gap: "8px" }}>
-                    <button
-                      onClick={() => setCodeEditMode(!codeEditMode)}
-                      className="btn btn-gray"
-                      style={{ padding: "8px 12px", fontSize: "0.8rem", boxShadow: "none" }}
-                    >
-                      {codeEditMode ? "View Sandbox" : "Edit HTML Code"}
-                    </button>
-                    <button
-                      onClick={handlePublish}
-                      disabled={!generatedGame.isValid}
-                      className="btn btn-success"
-                      style={{ padding: "8px 12px", fontSize: "0.8rem", boxShadow: "none" }}
-                    >
-                      {editingGameId ? "Save Changes" : "Publish Game"}
-                    </button>
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px", width: "100%" }}>
+                  <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "flex-end", gap: "16px" }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px", flex: 1, minWidth: "250px" }}>
+                      <label htmlFor="game-title-editable" style={{ fontSize: "0.85rem", fontWeight: "700" }}>Game Name</label>
+                      <input
+                        id="game-title-editable"
+                        type="text"
+                        value={generatedGame.title}
+                        onChange={e => handleTitleChange(e.target.value)}
+                        style={{
+                          padding: "10px",
+                          borderRadius: "10px",
+                          border: "2px solid #cbd5e1",
+                          fontSize: "1rem",
+                          width: "100%",
+                          backgroundColor: "#fff"
+                        }}
+                      />
+                    </div>
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <button
+                        onClick={() => setCodeEditMode(!codeEditMode)}
+                        className="btn btn-gray"
+                        style={{ padding: "8px 12px", fontSize: "0.8rem", boxShadow: "none" }}
+                      >
+                        {codeEditMode ? "View Sandbox" : "Edit HTML Code"}
+                      </button>
+                      <button
+                        onClick={handlePublish}
+                        disabled={!generatedGame.isValid || !generatedGame.title.trim()}
+                        className="btn btn-success"
+                        style={{ padding: "8px 12px", fontSize: "0.8rem", boxShadow: "none" }}
+                      >
+                        {editingGameId ? "Save Changes" : "Publish Game"}
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -673,9 +925,26 @@ export const AdminDashboard: React.FC = () => {
                 {/* Edit Mode / Sandbox switch */}
                 {codeEditMode ? (
                   <div>
-                    <label htmlFor="html-editor-textarea" style={{ display: "block", fontSize: "0.85rem", fontWeight: "700", marginBottom: "4px" }}>
-                      HTML/CSS/JS Source Code
-                    </label>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                      <label htmlFor="html-editor-textarea" style={{ fontSize: "0.85rem", fontWeight: "700" }}>
+                        HTML/CSS/JS Source Code
+                      </label>
+                      <button
+                        onClick={handleClearHtml}
+                        className="btn"
+                        style={{
+                          padding: "4px 10px",
+                          backgroundColor: "#fee2e2",
+                          border: "1.5px solid #fecaca",
+                          color: "#b91c1c",
+                          borderRadius: "8px",
+                          fontSize: "0.75rem",
+                          boxShadow: "none"
+                        }}
+                      >
+                        🗑️ Clear Code
+                      </button>
+                    </div>
                     <textarea
                       id="html-editor-textarea"
                       value={draftCode}
@@ -704,6 +973,29 @@ export const AdminDashboard: React.FC = () => {
                     />
                   </div>
                 )}
+
+                {/* Tweak & Regenerate section */}
+                <div style={{ marginTop: "20px", borderTop: "2px solid #cbd5e1", paddingTop: "20px", display: "flex", flexDirection: "column", gap: "10px" }}>
+                  <label htmlFor="tweak-instructions-textarea" style={{ fontSize: "0.95rem", fontWeight: "700", display: "flex", alignItems: "center", gap: "6px" }}>
+                    🪄 Tweak & Re-generate Activity (Add custom modifications)
+                  </label>
+                  <textarea
+                    id="tweak-instructions-textarea"
+                    rows={3}
+                    placeholder="e.g. Change background color to neon green, or make interactive elements 20% larger..."
+                    value={tweakInstruction}
+                    onChange={e => setTweakInstruction(e.target.value)}
+                    style={{ padding: "12px", borderRadius: "10px", border: "2px solid #cbd5e1", fontSize: "0.85rem", resize: "vertical" }}
+                  />
+                  <button
+                    onClick={handleRegenerate}
+                    disabled={isGenerating || !tweakInstruction.trim()}
+                    className="btn btn-primary"
+                    style={{ alignSelf: "flex-start", padding: "10px 20px", fontSize: "0.85rem" }}
+                  >
+                    {isGenerating ? "AI Regenerating..." : "Apply Tweaks & Regenerate Code"}
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -718,17 +1010,7 @@ export const AdminDashboard: React.FC = () => {
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                 {games.map(game => (
-                  <div
-                    key={game.id}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      padding: "16px",
-                      backgroundColor: "var(--bg-primary)",
-                      borderRadius: "16px"
-                    }}
-                  >
+                  <div key={game.id} className="admin-game-item">
                     <div>
                       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                         <span style={{ fontWeight: "700", fontSize: "1.05rem" }}>{game.title}</span>
@@ -754,7 +1036,7 @@ export const AdminDashboard: React.FC = () => {
                       </div>
                     </div>
 
-                    <div style={{ display: "flex", gap: "8px" }}>
+                    <div className="admin-game-actions">
                       <button
                         onClick={() => handleTogglePublish(game)}
                         className="btn"
@@ -809,35 +1091,172 @@ export const AdminDashboard: React.FC = () => {
 
         {/* TAB 4: ANALYTICS REPORTS */}
         {activeTab === "analytics" && (
-          <div className="play-card" style={{ overflowX: "auto" }}>
+          <div className="play-card">
             <h3 style={{ fontSize: "1.1rem", marginBottom: "16px" }}>Activity Analytics Log</h3>
             {logs.length === 0 ? (
               <p style={{ color: "var(--text-secondary)" }}>No student logs recorded yet.</p>
             ) : (
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
-                <thead>
-                  <tr style={{ borderBottom: "2px solid #cbd5e1", textAlign: "left" }}>
-                    <th style={{ padding: "8px" }}>Student</th>
-                    <th style={{ padding: "8px" }}>Game</th>
-                    <th style={{ padding: "8px" }}>Duration</th>
-                    <th style={{ padding: "8px" }}>Attempts</th>
-                    <th style={{ padding: "8px" }}>Reward</th>
-                    <th style={{ padding: "8px" }}>Device</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {logs.map(log => (
-                    <tr key={log.id} style={{ borderBottom: "1px solid #e2e8f0" }}>
-                      <td style={{ padding: "8px", fontWeight: "700" }}>{log.studentName}</td>
-                      <td style={{ padding: "8px" }}>{log.gameTitle}</td>
-                      <td style={{ padding: "8px" }}>{log.duration}s</td>
-                      <td style={{ padding: "8px" }}>{log.attempts}</td>
-                      <td style={{ padding: "8px", color: "var(--success)", fontWeight: "700" }}>{log.rewardEarned}</td>
-                      <td style={{ padding: "8px", color: "var(--text-secondary)" }}>{log.device}</td>
+              <div className="admin-table-wrapper">
+                <table className="admin-table">
+                  <thead>
+                    <tr style={{ borderBottom: "2px solid #cbd5e1", textAlign: "left" }}>
+                      <th>Student</th>
+                      <th>Game</th>
+                      <th>Duration</th>
+                      <th>Attempts</th>
+                      <th>Reward</th>
+                      <th>Device Info</th>
+                      <th>IP Address</th>
+                      <th>Attempts History</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {logs.map(log => (
+                      <tr key={log.id} style={{ borderBottom: "1px solid #e2e8f0" }}>
+                        <td style={{ fontWeight: "700" }}>{log.studentName}</td>
+                        <td>{log.gameTitle}</td>
+                        <td>{log.duration}s</td>
+                        <td>{log.attempts}</td>
+                        <td style={{ color: "var(--success)", fontWeight: "700" }}>{log.rewardEarned}</td>
+                        <td style={{ color: "var(--text-secondary)", fontSize: "0.8rem" }}>
+                          {log.deviceType ? `${log.deviceType} (${log.browser})` : `${log.device} (${log.browser})`}
+                        </td>
+                        <td style={{ color: "var(--text-secondary)", fontSize: "0.8rem" }}>{log.ip || "N/A"}</td>
+                        <td>
+                          {log.attemptsHistory && log.attemptsHistory.length > 0 ? (
+                            <button
+                              onClick={() => setSelectedDetailLog(log)}
+                              className="btn"
+                              style={{
+                                padding: "4px 10px",
+                                backgroundColor: "var(--accent-primary)",
+                                color: "#ffffff",
+                                fontSize: "0.75rem",
+                                borderRadius: "8px",
+                                cursor: "pointer",
+                                boxShadow: "none"
+                              }}
+                            >
+                              🔍 View Attempts ({log.attemptsHistory.length})
+                            </button>
+                          ) : (
+                            <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>N/A</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Action History Breakdown Modal */}
+            {selectedDetailLog && (
+              <div
+                style={{
+                  position: "fixed",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  backgroundColor: "rgba(15, 23, 42, 0.4)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  zIndex: 10000,
+                  padding: "20px",
+                  backdropFilter: "blur(4px)"
+                }}
+              >
+                <div
+                  className="play-card"
+                  style={{
+                    maxWidth: "500px",
+                    width: "100%",
+                    maxHeight: "85vh",
+                    overflowY: "auto",
+                    padding: "24px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "16px",
+                    backgroundColor: "var(--bg-secondary)",
+                    border: "4px solid var(--accent-primary)"
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "2px solid #cbd5e1", paddingBottom: "10px" }}>
+                    <h3 style={{ fontSize: "1.2rem", fontWeight: "900", margin: 0 }}>
+                      📋 Attempt History Details
+                    </h3>
+                    <button
+                      onClick={() => setSelectedDetailLog(null)}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        fontSize: "1.5rem",
+                        cursor: "pointer",
+                        fontWeight: "900",
+                        color: "var(--text-secondary)"
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                  
+                  <div>
+                    <p style={{ margin: "2px 0", fontSize: "0.9rem" }}><strong>Student:</strong> {selectedDetailLog.studentName}</p>
+                    <p style={{ margin: "2px 0", fontSize: "0.9rem" }}><strong>Activity:</strong> {selectedDetailLog.gameTitle}</p>
+                    <p style={{ margin: "2px 0", fontSize: "0.9rem" }}><strong>Device ID:</strong> <span style={{ fontFamily: "monospace", fontSize: "0.8rem" }}>{selectedDetailLog.deviceId || "N/A"}</span></p>
+                    <p style={{ margin: "2px 0", fontSize: "0.9rem" }}><strong>User Agent:</strong> <span style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>{selectedDetailLog.userAgent || "Unknown"}</span></p>
+                  </div>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "10px" }}>
+                    {selectedDetailLog.attemptsHistory?.map((attempt, index) => (
+                      <div
+                        key={index}
+                        style={{
+                          padding: "12px",
+                          borderRadius: "10px",
+                          border: "1.5px solid",
+                          borderColor: attempt.success ? "#86efac" : "#fca5a5",
+                          backgroundColor: attempt.success ? "#f0fdf4" : "#fff5f5",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center"
+                        }}
+                      >
+                        <div style={{ display: "flex", flexDirection: "column", gap: "4px", flex: 1, paddingRight: "10px" }}>
+                          <span style={{ fontSize: "0.85rem", fontWeight: "700" }}>
+                            Q{index + 1}: {attempt.question}
+                          </span>
+                          <span style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>
+                            Answered: <strong style={{ color: "var(--text-primary)" }}>{attempt.answer}</strong>
+                          </span>
+                        </div>
+                        <span
+                          style={{
+                            fontSize: "0.75rem",
+                            fontWeight: "800",
+                            padding: "4px 8px",
+                            borderRadius: "6px",
+                            color: attempt.success ? "#065f46" : "#b91c1c",
+                            backgroundColor: attempt.success ? "#d1fae5" : "#fee2e2"
+                          }}
+                        >
+                          {attempt.success ? "✓ Correct" : "✗ Incorrect"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <button
+                    onClick={() => setSelectedDetailLog(null)}
+                    className="btn btn-primary"
+                    style={{ width: "100%", padding: "10px", marginTop: "10px" }}
+                  >
+                    Close History
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         )}
