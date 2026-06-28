@@ -29,7 +29,7 @@ const parseGameTitle = (fullTitle: string) => {
 };
 
 export const Dashboard: React.FC = () => {
-  const { currentStudent, setPlayingGame } = useApp();
+  const { currentStudent, setPlayingGame, installPrompt, triggerInstall } = useApp();
   const [games, setGames] = useState<Game[]>([]);
   const [selectedSubject, setSelectedSubject] = useState("math");
   const [completedGames, setCompletedGames] = useState<Record<string, string>>({});
@@ -219,6 +219,50 @@ export const Dashboard: React.FC = () => {
           <StreakBadge days={currentStudent?.streak || 1} />
         </div>
       </PlayCard>
+
+      {/* Custom Add to Homescreen install prompt for PWA support */}
+      {installPrompt && (
+        <PlayCard
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            padding: "12px 18px",
+            backgroundColor: "#e0f2fe",
+            borderColor: "#38bdf8",
+            borderWidth: "2.5px",
+            borderStyle: "solid",
+            marginBottom: "20px",
+            borderRadius: "16px",
+            boxShadow: "0 4px 0 #0284c7"
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <span style={{ fontSize: "1.8rem" }}>📱</span>
+            <div style={{ textAlign: "left" }}>
+              <strong style={{ display: "block", fontSize: "0.95rem", color: "#0369a1" }}>Install app on your phone!</strong>
+              <span style={{ fontSize: "0.8rem", color: "#0284c7" }}>Play games faster from your homescreen!</span>
+            </div>
+          </div>
+          <button
+            onClick={triggerInstall}
+            className="btn"
+            style={{
+              padding: "8px 14px",
+              backgroundColor: "var(--accent-secondary)",
+              color: "#ffffff",
+              fontSize: "0.85rem",
+              borderRadius: "10px",
+              fontWeight: "800",
+              boxShadow: "0 3px 0 #0284c7",
+              border: "none",
+              cursor: "pointer"
+            }}
+          >
+            📥 Install
+          </button>
+        </PlayCard>
+      )}
 
       {/* Subject Selector using Reusable PlayCard */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "12px", marginBottom: "24px" }}>

@@ -32,6 +32,8 @@ interface AppContextType {
   logOutAdmin: () => Promise<void>;
   logInAdmin: (email?: string, password?: string) => Promise<boolean>;
   recordActivity: (log: Omit<ActivityLog, "id" | "studentId" | "studentName" | "gameId" | "gameTitle" | "device" | "browser">) => void;
+  installPrompt: any;
+  triggerInstall: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -42,13 +44,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [currentPlayingGame, setCurrentPlayingGame] = useState<Game | null>(null);
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(false);
   const [geminiApiKey, setGeminiApiKey] = useState<string>("");
-  
   const [accessibility, setAccessibility] = useState<AccessibilityConfig>({
     fontSize: "normal",
     useDyslexicFont: false,
     highContrast: false,
     voiceAssistance: true
   });
+
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      console.log("PWA beforeinstallprompt event intercepted!");
+      setInstallPrompt(e);
+    };
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const triggerInstall = async () => {
+    if (!installPrompt) return;
+    try {
+      installPrompt.prompt();
+      const { outcome } = await installPrompt.userChoice;
+      console.log("User choice for PWA installation resolved to:", outcome);
+      setInstallPrompt(null);
+    } catch (err) {
+      console.error("Failed to prompt PWA install:", err);
+    }
+  };
 
   // Initialize DB and load active student if exists
   useEffect(() => {
@@ -345,7 +372,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addStars,
         logOutAdmin,
         logInAdmin,
-        recordActivity
+        recordActivity,
+        installPrompt,
+        triggerInstall
       }}
     >
       {children}
