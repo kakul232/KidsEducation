@@ -5,9 +5,14 @@ import Onboarding from "./views/student/Onboarding";
 import Dashboard from "./views/student/Dashboard";
 import GamePlayer from "./views/student/GamePlayer";
 import AdminDashboard from "./views/admin/AdminDashboard";
+import { KidsLoader } from "./components/KidsLoader";
 
 const MainAppContent: React.FC = () => {
-  const { currentView } = useApp();
+  const { currentView, isAuthLoading } = useApp();
+
+  if (isAuthLoading) {
+    return <KidsLoader />;
+  }
 
   const renderView = () => {
     switch (currentView) {

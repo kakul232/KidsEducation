@@ -34,6 +34,7 @@ interface AppContextType {
   recordActivity: (log: Omit<ActivityLog, "id" | "studentId" | "studentName" | "gameId" | "gameTitle" | "device" | "browser">) => void;
   installPrompt: any;
   triggerInstall: () => Promise<void>;
+  isAuthLoading: boolean;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -77,19 +78,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+
   // Initialize DB and load active student if exists
   useEffect(() => {
     const initializeAppDatabase = async () => {
-      await LocalDB.init();
-      
-      // Load student from localStorage if exists
-      const activeStudentId = localStorage.getItem("active_student_id");
-      if (activeStudentId) {
-        const student = await LocalDB.getStudent(activeStudentId);
-        if (student) {
-          setCurrentStudent(student);
-          setCurrentView("dashboard");
+      try {
+        await LocalDB.init();
+        
+        // Load student from localStorage if exists
+        const activeStudentId = localStorage.getItem("active_student_id");
+        if (activeStudentId) {
+          const student = await LocalDB.getStudent(activeStudentId);
+          if (student) {
+            setCurrentStudent(student);
+            setCurrentView("dashboard");
+          } else {
+            // If student ID is in localStorage but no student is found in DB, clear it
+            localStorage.removeItem("active_student_id");
+            setCurrentView("onboarding");
+          }
+        } else {
+          setCurrentView("onboarding");
         }
+      } catch (err) {
+        console.error("Auth database initialization failed:", err);
+        setCurrentView("onboarding");
+      } finally {
+        setIsAuthLoading(false);
       }
     };
     initializeAppDatabase();
@@ -374,7 +390,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         logInAdmin,
         recordActivity,
         installPrompt,
-        triggerInstall
+        triggerInstall,
+        isAuthLoading
       }}
     >
       {children}
