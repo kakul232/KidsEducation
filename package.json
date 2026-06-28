@@ -8,10 +8,10 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "android:init": "npx cap init \"Play Studio\" \"com.playstudio.app\" --web-dir=dist && npx cap add android",
+    "android:init": "npx cap add android",
     "android:sync": "npm run build && npx cap sync",
     "android:open": "npx cap open android",
-    "android:export": "npm run build && npx cap sync && cd android && ./gradlew assembleDebug && cd .."
+    "android:export": "npm run build && npx cap sync && cd android && gradlew assembleDebug && cd .."
   },
   "dependencies": {
     "@capacitor/android": "^8.4.1",
