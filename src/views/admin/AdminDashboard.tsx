@@ -282,6 +282,22 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
+  const handleSaveGameStarsRequired = async (gameId: string, starsVal: number) => {
+    try {
+      const game = games.find(g => g.id === gameId);
+      if (!game) return;
+
+      const updated = {
+        ...game,
+        starsRequired: isNaN(starsVal) ? 0 : starsVal
+      };
+      await LocalDB.saveGame(updated);
+      loadData();
+    } catch (err: any) {
+      console.error("Failed to save game star requirement:", err);
+    }
+  };
+
   const handleDeleteRequest = async (requestId: string) => {
     if (confirm("Are you sure you want to archive/delete this student request?")) {
       try {
@@ -1530,6 +1546,23 @@ export const AdminDashboard: React.FC = () => {
                             onBlur={(e) => handleSaveGameOrder(game.id, parseInt(e.target.value))}
                             style={{
                               width: "55px",
+                              padding: "2px 4px",
+                              borderRadius: "6px",
+                              border: "1.5px solid #cbd5e1",
+                              fontSize: "0.7rem",
+                              textAlign: "center"
+                            }}
+                          />
+                        </div>
+                        <span>•</span>
+                        <div style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                          <span>Min Stars:</span>
+                          <input
+                            type="number"
+                            defaultValue={game.starsRequired || 0}
+                            onBlur={(e) => handleSaveGameStarsRequired(game.id, parseInt(e.target.value))}
+                            style={{
+                              width: "65px",
                               padding: "2px 4px",
                               borderRadius: "6px",
                               border: "1.5px solid #cbd5e1",

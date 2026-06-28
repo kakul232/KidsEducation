@@ -43,6 +43,8 @@ export const Dashboard: React.FC = () => {
   const [isSubmittingIdea, setIsSubmittingIdea] = useState(false);
   const [showLockModal, setShowLockModal] = useState(false);
   const [lockedGameTitle, setLockedGameTitle] = useState("");
+  const [lockedReason, setLockedReason] = useState<"premium" | "stars">("premium");
+  const [lockedStarsRequired, setLockedStarsRequired] = useState(0);
   const [showIdeaSuccess, setShowIdeaSuccess] = useState(false);
 
   useEffect(() => {
@@ -64,22 +66,56 @@ export const Dashboard: React.FC = () => {
         setCompletedGames(completedMap);
       }
 
-      // Sort: Uncompleted games first, completed games pushed to the bottom
+      // Sort: Unlocked & Uncompleted first, then Unlocked & Completed, then Locked/Upcoming
       const sorted = [...list].sort((a, b) => {
+        const aPremiumLocked = a.isFree === false && currentStudent?.tier !== "paid";
+        const aStarLocked = a.starsRequired ? (currentStudent?.stars || 0) < a.starsRequired : false;
+        const aLocked = aPremiumLocked || aStarLocked;
+        
+        const bPremiumLocked = b.isFree === false && currentStudent?.tier !== "paid";
+        const bStarLocked = b.starsRequired ? (currentStudent?.stars || 0) < b.starsRequired : false;
+        const bLocked = bPremiumLocked || bStarLocked;
+
         const aCompleted = !!completedMap[a.id];
         const bCompleted = !!completedMap[b.id];
-        
-        if (aCompleted && !bCompleted) return 1;
-        if (!aCompleted && bCompleted) return -1;
-        
-        // Custom Admin Ordering (0 is lowest/default, undefined fits last or 0)
+
+        // Determine category weights (lower weight = higher display priority)
+        let aWeight = 1; // Unlocked & Uncompleted
+        if (aLocked) {
+          aWeight = 3; // Locked/Upcoming
+        } else if (aCompleted) {
+          aWeight = 2; // Unlocked & Completed
+        }
+
+        let bWeight = 1; // Unlocked & Uncompleted
+        if (bLocked) {
+          bWeight = 3; // Locked/Upcoming
+        } else if (bCompleted) {
+          bWeight = 2; // Unlocked & Completed
+        }
+
+        if (aWeight !== bWeight) {
+          return aWeight - bWeight;
+        }
+
+        // If they are in the same category, tie-breaker:
+        if (aLocked && bLocked) {
+          // Locked games sort by starsRequired ascending (e.g. 300, then 400, then 500...)
+          const aStars = a.starsRequired !== undefined ? a.starsRequired : 999999;
+          const bStars = b.starsRequired !== undefined ? b.starsRequired : 999999;
+          if (aStars !== bStars) {
+            return aStars - bStars;
+          }
+        }
+
+        // Otherwise, sort by Custom Admin Ordering
         const aOrder = a.order !== undefined ? a.order : 99999;
         const bOrder = b.order !== undefined ? b.order : 99999;
         if (aOrder !== bOrder) {
           return aOrder - bOrder;
         }
 
-        // Secondary sort: Newest first
+        // Tertiary sort: Newest first
         const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
         const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
         return bTime - aTime;
@@ -447,15 +483,26 @@ export const Dashboard: React.FC = () => {
           >
             {games.map(game => {
               const { emoji, cleanTitle } = parseGameTitle(game.title);
-              const isGameLocked = game.isFree === false && currentStudent?.tier !== "paid";
+              const isPremiumLocked = game.isFree === false && currentStudent?.tier !== "paid";
+              const isStarLocked = game.starsRequired ? (currentStudent?.stars || 0) < game.starsRequired : false;
+              const isGameLocked = isPremiumLocked || isStarLocked;
               return (
                 <PlayCard
                   key={game.id}
                   onClick={() => {
                     if (isGameLocked) {
-                      speakText(`Ooh! ${cleanTitle} is a premium game! Ask your teacher or parent to unlock it.`);
-                      setLockedGameTitle(cleanTitle);
-                      setShowLockModal(true);
+                      if (isStarLocked) {
+                        speakText(`Ooh! You need ${game.starsRequired} Stars to play ${cleanTitle}! You currently have ${currentStudent?.stars || 0} stars. Keep playing to earn more!`);
+                        setLockedGameTitle(cleanTitle);
+                        setLockedReason("stars");
+                        setLockedStarsRequired(game.starsRequired || 0);
+                        setShowLockModal(true);
+                      } else {
+                        speakText(`Ooh! ${cleanTitle} is a premium game! Ask your teacher or parent to unlock it.`);
+                        setLockedGameTitle(cleanTitle);
+                        setLockedReason("premium");
+                        setShowLockModal(true);
+                      }
                     } else {
                       setPlayingGame(game);
                     }
@@ -475,7 +522,7 @@ export const Dashboard: React.FC = () => {
                     position: "relative"
                   }}
                 >
-                  {/* Premium Lock Overlay Badge */}
+                  {/* Premium / Star Lock Overlay Badge */}
                   {isGameLocked && (
                     <div
                       style={{
@@ -484,19 +531,28 @@ export const Dashboard: React.FC = () => {
                         right: "10px",
                         backgroundColor: "#ef4444",
                         color: "white",
-                        borderRadius: "50%",
-                        width: "30px",
-                        height: "30px",
+                        borderRadius: isStarLocked ? "12px" : "50%",
+                        padding: isStarLocked ? "4px 8px" : "0",
+                        height: isStarLocked ? "auto" : "30px",
+                        minWidth: isStarLocked ? "auto" : "30px",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
                         boxShadow: "0 4px 8px rgba(239, 68, 68, 0.4)",
                         border: "2.5px solid white",
+                        fontSize: isStarLocked ? "0.7rem" : "inherit",
+                        fontWeight: "900",
                         zIndex: 5
                       }}
-                      title="Premium Game"
+                      title={isStarLocked ? `Requires ${game.starsRequired} Stars` : "Premium Game"}
                     >
-                      <Lock size={12} fill="white" />
+                      {isStarLocked ? (
+                        <span style={{ display: "flex", alignItems: "center", gap: "3px", whiteSpace: "nowrap" }}>
+                          🔒 {game.starsRequired} ⭐
+                        </span>
+                      ) : (
+                        <Lock size={12} fill="white" />
+                      )}
                     </div>
                   )}
 
@@ -987,12 +1043,23 @@ export const Dashboard: React.FC = () => {
               borderRadius: "24px"
             }}
           >
-            <div style={{ fontSize: "3.5rem", animation: "kids-wiggle 2s infinite ease-in-out" }}>🔒</div>
-            <h3 style={{ fontSize: "1.45rem", fontWeight: "900", color: "#b91c1c", margin: 0 }}>
-              Premium Game!
+            <div style={{ fontSize: "3.5rem", animation: "kids-wiggle 2s infinite ease-in-out" }}>
+              {lockedReason === "stars" ? "⭐" : "🔒"}
+            </div>
+            <h3 style={{ fontSize: "1.45rem", fontWeight: "900", color: lockedReason === "stars" ? "#b45309" : "#b91c1c", margin: 0 }}>
+              {lockedReason === "stars" ? "Stars Required!" : "Premium Game!"}
             </h3>
             <p style={{ color: "var(--text-secondary)", fontWeight: "700", fontSize: "0.95rem", margin: 0, lineHeight: "1.4" }}>
-              "{lockedGameTitle}" is a premium quest. Please ask your parent or teacher to unlock it for you!
+              {lockedReason === "stars" ? (
+                <span>
+                  You need <strong>{lockedStarsRequired.toLocaleString()}</strong> Stars to unlock "{lockedGameTitle}".<br />
+                  You currently have <strong>{currentStudent?.stars || 0}</strong> stars. Keep playing to collect more! 🎈
+                </span>
+              ) : (
+                <span>
+                  "{lockedGameTitle}" is a premium quest. Please ask your parent or teacher to unlock it for you!
+                </span>
+              )}
             </p>
             <button
               onClick={() => setShowLockModal(false)}
@@ -1002,13 +1069,13 @@ export const Dashboard: React.FC = () => {
                 padding: "14px",
                 fontSize: "1.05rem",
                 fontWeight: "800",
-                backgroundColor: "#ef4444",
-                borderColor: "#dc2626",
+                backgroundColor: lockedReason === "stars" ? "#d97706" : "#ef4444",
+                borderColor: lockedReason === "stars" ? "#b45309" : "#dc2626",
                 color: "#ffffff",
-                boxShadow: "0 4px 0 #dc2626"
+                boxShadow: `0 4px 0 ${lockedReason === "stars" ? "#b45309" : "#dc2626"}`
               }}
             >
-              Go Back
+              {lockedReason === "stars" ? "Okay! 🎮" : "Go Back"}
             </button>
           </PlayCard>
         </div>

@@ -72,6 +72,7 @@ export interface Game {
   assignedStudentId?: string;
   isFree?: boolean;
   order?: number;
+  starsRequired?: number;
 }
 
 // Initial default games to populate if none exist
