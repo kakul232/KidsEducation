@@ -1,6 +1,4 @@
 import { validateGameCode } from "./validator";
-import frogHopperRaw from "../game/Frog-Hopper.html?raw";
-import balloonCountingRaw from "../game/Ballon-counting.html?raw";
 
 export interface GeneratedGameResponse {
   title: string;

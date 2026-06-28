@@ -2,13 +2,12 @@ import React, { useState, useEffect } from "react";
 import { useApp } from "../../context/AppContext";
 import LocalDB from "../../services/db";
 import type { Game, ActivityLog } from "../../services/db";
-import { Trophy, Play, LogOut } from "lucide-react";
+import { Trophy, Play } from "lucide-react";
 import { SUBJECTS } from "../../utils/constants";
 import { AvatarIcon } from "../../components/AvatarIcon";
 import { StarBadge } from "../../components/StarBadge";
 import { StreakBadge } from "../../components/StreakBadge";
 import { PlayCard } from "../../components/PlayCard";
-import { ChunkyButton } from "../../components/ChunkyButton";
 import KidsLoader from "../../components/KidsLoader";
 
 const DIFFICULTY_SYMBOLS: Record<string, { symbol: string; label: string; color: string; bg: string }> = {
