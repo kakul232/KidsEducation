@@ -109,8 +109,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],
       manifest: {
-        name: 'Educational Play Studio',
-        short_name: 'PlayStudio',
+        name: 'WonderQuest: Magic Play Studio',
+        short_name: 'WonderQuest',
         description: 'Interactive educational games for dyslexic children',
         theme_color: '#4f46e5',
         background_color: '#f4f7f6',
