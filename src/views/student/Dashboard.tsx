@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useApp } from "../../context/AppContext";
 import LocalDB from "../../services/db";
 import type { Game, ActivityLog } from "../../services/db";
-import { Trophy, Play, Lock, Lightbulb, Send } from "lucide-react";
+import { Trophy, Play, Lock, Send } from "lucide-react";
 import { SUBJECTS } from "../../utils/constants";
 import { AvatarIcon } from "../../components/AvatarIcon";
 import { StarBadge } from "../../components/StarBadge";
@@ -71,7 +71,7 @@ export const Dashboard: React.FC = () => {
         const aPremiumLocked = a.isFree === false && currentStudent?.tier !== "paid";
         const aStarLocked = a.starsRequired ? (currentStudent?.stars || 0) < a.starsRequired : false;
         const aLocked = aPremiumLocked || aStarLocked;
-        
+
         const bPremiumLocked = b.isFree === false && currentStudent?.tier !== "paid";
         const bStarLocked = b.starsRequired ? (currentStudent?.stars || 0) < b.starsRequired : false;
         const bLocked = bPremiumLocked || bStarLocked;
@@ -127,7 +127,7 @@ export const Dashboard: React.FC = () => {
     // 2. Synchronous Immediate load from local storage cache
     const cachedGames = LocalDB.getCachedGames();
     const cachedLogs = LocalDB.getCachedLogs();
-    
+
     // If we have cached games, show them immediately! If not, wait for network or local fallback
     if (cachedGames.length > 0) {
       renderGamesAndLogs(cachedGames, cachedLogs);
@@ -140,7 +140,7 @@ export const Dashboard: React.FC = () => {
           LocalDB.getGames(),
           LocalDB.getLogs()
         ]);
-        
+
         // Update states silently in the background
         renderGamesAndLogs(freshGames, freshLogs);
       } catch (err) {
@@ -149,7 +149,7 @@ export const Dashboard: React.FC = () => {
         setIsLoading(false);
       }
     };
-    
+
     fetchFreshData();
   }, [currentStudent]);
 
@@ -223,7 +223,7 @@ export const Dashboard: React.FC = () => {
             Time to Renew! 🌟
           </h2>
           <p style={{ color: "var(--text-secondary)", fontWeight: "700", fontSize: "1.05rem", margin: 0, lineHeight: "1.5" }}>
-            Hi {currentStudent.name}! Your learning dashboard validity has ended. 
+            Hi {currentStudent.name}! Your learning dashboard validity has ended.
             Please ask your parents or teacher to renew it so you can keep playing and earning stars!
           </p>
 
@@ -592,7 +592,7 @@ export const Dashboard: React.FC = () => {
                       }}
                     >
                       <span>{cleanTitle}</span>
-                      
+
                       {/* Animated NEW Tag for newly published games, hiding if completed */}
                       {isNew(game.createdAt) && !completedGames[game.id] && (
                         <span
@@ -905,7 +905,7 @@ export const Dashboard: React.FC = () => {
               <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: "0.95rem", fontWeight: "600", lineHeight: "1.4" }}>
                 What kind of game do you want to play? Write or describe your game idea below:
               </p>
-              
+
               <textarea
                 value={requestIdeaText}
                 onChange={(e) => setRequestIdeaText(e.target.value)}
