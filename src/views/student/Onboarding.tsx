@@ -42,7 +42,7 @@ export const Onboarding: React.FC = () => {
     <div className="container animate-slide-up" style={{ justifyContent: "center" }}>
       {isLoading && <KidsLoader />}
       <PlayCard style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-        
+
         {/* Title & Welcome */}
         <div style={{ textAlign: "center" }}>
           <div
@@ -163,7 +163,7 @@ export const Onboarding: React.FC = () => {
                 cursor: "pointer"
               }}
             >
-              <option value="">Select class (Optional) 🏫</option>
+              <option value="">Select class ... 🏫</option>
               <option value="Preschool">Preschool 🧸</option>
               <option value="Kindergarten">Kindergarten 🎒</option>
               <option value="Grade 1">Grade 1 ✏️</option>
