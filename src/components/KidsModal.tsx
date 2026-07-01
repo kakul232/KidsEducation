@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import PlayCard from "./PlayCard";
 
 interface KidsModalProps {
@@ -6,7 +6,7 @@ interface KidsModalProps {
   onClose: () => void;
   children: React.ReactNode;
   maxWidth?: string;
-  borderColor?: string; // fallback if border is not specified
+  borderColor?: string;
   border?: string;
   backgroundColor?: string;
   backdropColor?: string;
@@ -34,14 +34,37 @@ export const KidsModal: React.FC<KidsModalProps> = ({
   gap = "20px",
   style = {}
 }) => {
+  const modalRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (isOpen) {
+      // 1. Freeze the background scroll
       document.body.style.overflow = "hidden";
+      // 2. Break the viewport-flex constraint while modal is active
+      document.body.style.height = "100vh";
+
+      // 3. Autofocus the first interactive element (like buttons) for keyboard scroll focus
+      setTimeout(() => {
+        if (modalRef.current) {
+          const firstFocusable = modalRef.current.querySelector(
+            "button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])"
+          ) as HTMLElement;
+          if (firstFocusable) {
+            firstFocusable.focus();
+          } else {
+            modalRef.current.focus();
+          }
+        }
+      }, 50);
     } else {
+      // Clean back up when closed
       document.body.style.overflow = "";
+      document.body.style.height = "";
     }
+
     return () => {
       document.body.style.overflow = "";
+      document.body.style.height = "";
     };
   }, [isOpen]);
 
@@ -49,6 +72,8 @@ export const KidsModal: React.FC<KidsModalProps> = ({
 
   return (
     <div
+      ref={modalRef}
+      tabIndex={-1}
       onClick={onClose}
       style={{
         position: "fixed",
@@ -57,39 +82,46 @@ export const KidsModal: React.FC<KidsModalProps> = ({
         right: 0,
         bottom: 0,
         backgroundColor: backdropColor,
-        display: "flex",
-        alignItems: "center",
         justifyContent: "center",
+        display: "grid",
+        // placeItems: "center", // perfectly centers vertically and horizontally
         zIndex: zIndex,
-        padding: "20px",
-        backdropFilter: backdropFilter
+        padding: "40px 24px",
+        backdropFilter: backdropFilter,
+        outline: "none"
       }}
     >
-      <PlayCard
-        onClick={undefined} // static card wrapper
-        className="animate-pop-in"
+      <div
+        onClick={(e) => e.stopPropagation()}
         style={{
           maxWidth: maxWidth,
           width: "100%",
-          padding: padding,
-          textAlign: textAlign,
           display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: gap,
-          backgroundColor: backgroundColor,
-          border: border || `4px solid ${borderColor}`,
-          borderRadius: "24px",
-          boxShadow: "0 12px 30px rgba(0,0,0,0.15)",
-          ...style
+          flexDirection: "column"
         }}
-        // Stop click propagation so clicking inside the modal content doesn't trigger onClose
-        {...({
-          onClick: (e: React.MouseEvent) => e.stopPropagation()
-        } as any)}
       >
-        {children}
-      </PlayCard>
+        <PlayCard
+          className="animate-pop-in"
+          style={{
+            width: "100%",
+            maxHeight: "calc(100vh - 80px)",
+            overflowY: "auto",
+            padding: padding,
+            textAlign: textAlign,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: gap,
+            backgroundColor: backgroundColor,
+            border: border || `4px solid ${borderColor}`,
+            borderRadius: "24px",
+            boxShadow: "0 12px 30px rgba(0,0,0,0.15)",
+            ...style
+          }}
+        >
+          {children}
+        </PlayCard>
+      </div>
     </div>
   );
 };

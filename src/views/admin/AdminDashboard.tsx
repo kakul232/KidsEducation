@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useApp } from "../../context/AppContext";
 import LocalDB from "../../services/db";
-import type { Game, ActivityLog, Student, GameRequest } from "../../services/db";
+import type { Game, ActivityLog, Student, GameRequest, PaymentRecord } from "../../services/db";
 import { generateGame } from "../../services/gemini";
 import type { GeneratedGameResponse } from "../../services/gemini";
 import KidsLoader from "../../components/KidsLoader";
@@ -11,7 +11,8 @@ import {
   BookOpen,
   History,
   Settings as SettingsIcon,
-  Lightbulb
+  Lightbulb,
+  CreditCard
 } from "lucide-react";
 import AdminLogin from "../../components/admin/AdminLogin";
 import AdminHeader from "../../components/admin/AdminHeader";
@@ -21,6 +22,7 @@ import TabAllGames from "../../components/admin/TabAllGames";
 import TabRequests from "../../components/admin/TabRequests";
 import TabAnalytics from "../../components/admin/TabAnalytics";
 import TabSettings from "../../components/admin/TabSettings";
+import { TabPayments } from "../../components/admin/TabPayments";
 
 const THEME_PRESETS = {
   space: {
@@ -62,7 +64,7 @@ export const AdminDashboard: React.FC = () => {
   const [authError, setAuthError] = useState("");
 
   // Tab State
-  const [activeTab, setActiveTab] = useState<"stats" | "studio" | "games" | "analytics" | "requests" | "settings">("stats");
+  const [activeTab, setActiveTab] = useState<"stats" | "studio" | "games" | "analytics" | "requests" | "settings" | "payments">("stats");
 
   // Database lists
   const [students, setStudents] = useState<Student[]>([]);
@@ -70,6 +72,7 @@ export const AdminDashboard: React.FC = () => {
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [visibleLogCount, setVisibleLogCount] = useState(20);
   const [gameRequests, setGameRequests] = useState<GameRequest[]>([]);
+  const [payments, setPayments] = useState<PaymentRecord[]>([]);
 
   // AI Studio Generation Form States
   const [subject] = useState("Mathematics");
@@ -89,7 +92,7 @@ export const AdminDashboard: React.FC = () => {
   const [generationError, setGenerationError] = useState("");
   const [editingGameId, setEditingGameId] = useState<string | null>(null);
   const [tweakInstruction, setTweakInstruction] = useState("");
-  
+
   // Custom edit state for draft code
   const [draftCode, setDraftCode] = useState("");
   const [codeEditMode, setCodeEditMode] = useState(false);
@@ -160,13 +163,14 @@ export const AdminDashboard: React.FC = () => {
     await LocalDB.prepopulateDefaultGames();
 
     try {
-      const [studentsList, gamesList, logsList, requestsList] = await Promise.all([
+      const [studentsList, gamesList, logsList, requestsList, paymentsList] = await Promise.all([
         LocalDB.getStudents(),
         LocalDB.getGames(),
         LocalDB.getLogs(),
-        LocalDB.getGameRequests()
+        LocalDB.getGameRequests(),
+        LocalDB.getAllPaymentRecords()
       ]);
-      
+
       // Sort lists by updatedBy / Recent (newest first)
       const sortedStudents = [...studentsList].sort(
         (a, b) => new Date(b.lastActive || 0).getTime() - new Date(a.lastActive || 0).getTime()
@@ -185,6 +189,7 @@ export const AdminDashboard: React.FC = () => {
       setGames(sortedGames);
       setLogs(sortedLogs);
       setGameRequests(sortedRequests);
+      setPayments(paymentsList);
     } catch (e) {
       console.error("loadData failed in AdminDashboard:", e);
     } finally {
@@ -216,8 +221,22 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
+  const handleApprovePayment = async (paymentId: string) => {
+    try {
+      setIsDataLoading(true);
+      await LocalDB.approvePayment(paymentId);
+      alert("Payment approved and student premium validity extended by 1 month!");
+      await loadData();
+    } catch (err: any) {
+      console.error("Failed to approve payment:", err);
+      alert("Failed to approve payment: " + err.message);
+    } finally {
+      setIsDataLoading(false);
+    }
+  };
+
   const handleToggleSelectStudent = (id: string) => {
-    setSelectedStudentIds(prev => 
+    setSelectedStudentIds(prev =>
       prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
     );
   };
@@ -644,7 +663,7 @@ export const AdminDashboard: React.FC = () => {
   return (
     <div className="admin-container animate-slide-up">
       {(isGenerating || isDataLoading) && <KidsLoader />}
-      
+
       {/* Admin Header */}
       <AdminHeader setView={setView} logOutAdmin={logOutAdmin} />
 
@@ -664,6 +683,7 @@ export const AdminDashboard: React.FC = () => {
           { id: "games", label: "All Games", icon: <BookOpen size={18} /> },
           { id: "requests", label: "Student Ideas", icon: <Lightbulb size={18} /> },
           { id: "analytics", label: "Analytics", icon: <History size={18} /> },
+          { id: "payments", label: "Payments", icon: <CreditCard size={18} /> },
           { id: "settings", label: "Settings", icon: <SettingsIcon size={18} /> }
         ].map(tab => (
           <button
@@ -688,7 +708,7 @@ export const AdminDashboard: React.FC = () => {
 
       {/* Main Tab Content */}
       <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-        
+
         {/* TAB 1: OVERVIEW STATS */}
         {activeTab === "stats" && (
           <TabOverview
@@ -783,6 +803,15 @@ export const AdminDashboard: React.FC = () => {
             visibleLogCount={visibleLogCount}
             selectedDetailLog={selectedDetailLog}
             setSelectedDetailLog={setSelectedDetailLog}
+          />
+        )}
+
+        {/* TAB 7: PAYMENTS */}
+        {activeTab === "payments" && (
+          <TabPayments
+            payments={payments}
+            handleApprovePayment={handleApprovePayment}
+            isDataLoading={isDataLoading}
           />
         )}
 

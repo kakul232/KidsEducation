@@ -48,5 +48,11 @@ service cloud.firestore {
     match /challenges/{challengeId} {
       allow read, write: if true;
     }
+
+    // 9. Payments collection: Students can submit payments, only authenticated admins can manage/read/write
+    match /payments/{paymentId} {
+      allow create: if true;
+      allow read, update, delete: if request.auth != null;
+    }
   }
 }

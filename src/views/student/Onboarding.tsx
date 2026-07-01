@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useApp } from "../../context/AppContext";
 import { Sparkles, GraduationCap } from "lucide-react";
 import { AVATARS } from "../../utils/constants";
@@ -12,7 +12,7 @@ import { getClientDetails } from "../../utils/device";
 
 export const Onboarding: React.FC = () => {
   const { setOnboarding, setView } = useApp();
-  const [activeTab, setActiveTab] = useState<"register" | "login">("register");
+  const [activeTab, setActiveTab] = useState<"register" | "login">("login");
 
   // Registration Form States
   const [name, setName] = useState("");
@@ -34,6 +34,25 @@ export const Onboarding: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
+  useEffect(() => {
+    const savedPhone = localStorage.getItem("saved_parent_phone");
+    if (savedPhone) {
+      setLoginPhone(savedPhone);
+      setIsLoading(true);
+      LocalDB.getStudentsByPhone(savedPhone)
+        .then(studentsList => {
+          setFoundStudents(studentsList);
+          setHasSearchedLoginPhone(true);
+        })
+        .catch(err => {
+          console.error("Failed to load saved parent phone students:", err);
+        })
+        .finally(() => {
+          setIsLoading(false);
+        });
+    }
+  }, []);
+
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
@@ -51,7 +70,7 @@ export const Onboarding: React.FC = () => {
       const details = await getClientDetails();
       const existingStudents = await LocalDB.getStudents();
       const cleanName = name.trim().toLowerCase();
-      
+
       const matched = existingStudents.find(s => {
         const sName = s.name.trim().toLowerCase();
         if (sName !== cleanName) return false;
@@ -61,7 +80,7 @@ export const Onboarding: React.FC = () => {
       });
 
       setIsLoading(false);
-      
+
       if (matched) {
         setPatternTargetStudent(matched);
         if (matched.patternLock) {
@@ -113,6 +132,10 @@ export const Onboarding: React.FC = () => {
     setIsLoading(true);
     setErrorMsg("");
     try {
+      const parentPhoneToSave = patternTargetStudent?.phone || phone.trim();
+      if (parentPhoneToSave) {
+        localStorage.setItem("saved_parent_phone", parentPhoneToSave);
+      }
       if (showPatternLock === "set") {
         if (patternTargetStudent) {
           // Matched student with no pattern lock previously
@@ -206,25 +229,6 @@ export const Onboarding: React.FC = () => {
             <div style={{ display: "flex", gap: "8px", backgroundColor: "#f1f5f9", padding: "4px", borderRadius: "12px", marginBottom: "4px" }}>
               <button
                 type="button"
-                onClick={() => { setActiveTab("register"); setErrorMsg(""); }}
-                style={{
-                  flex: 1,
-                  padding: "10px",
-                  fontSize: "0.85rem",
-                  fontWeight: "800",
-                  borderRadius: "10px",
-                  border: "none",
-                  backgroundColor: activeTab === "register" ? "#fff" : "transparent",
-                  color: activeTab === "register" ? "var(--text-primary)" : "var(--text-secondary)",
-                  boxShadow: activeTab === "register" ? "0 4px 6px rgba(0,0,0,0.05)" : "none",
-                  cursor: "pointer",
-                  transition: "all 0.2s"
-                }}
-              >
-                🆕 Join In (Register)
-              </button>
-              <button
-                type="button"
                 onClick={() => { setActiveTab("login"); setErrorMsg(""); }}
                 style={{
                   flex: 1,
@@ -241,6 +245,25 @@ export const Onboarding: React.FC = () => {
                 }}
               >
                 🔑 Kid Login
+              </button>
+              <button
+                type="button"
+                onClick={() => { setActiveTab("register"); setErrorMsg(""); }}
+                style={{
+                  flex: 1,
+                  padding: "10px",
+                  fontSize: "0.85rem",
+                  fontWeight: "800",
+                  borderRadius: "10px",
+                  border: "none",
+                  backgroundColor: activeTab === "register" ? "#fff" : "transparent",
+                  color: activeTab === "register" ? "var(--text-primary)" : "var(--text-secondary)",
+                  boxShadow: activeTab === "register" ? "0 4px 6px rgba(0,0,0,0.05)" : "none",
+                  cursor: "pointer",
+                  transition: "all 0.2s"
+                }}
+              >
+                🆕 Join In (Register)
               </button>
             </div>
 
@@ -424,47 +447,49 @@ export const Onboarding: React.FC = () => {
             ) : (
               /* Login Form */
               <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                <form onSubmit={handleLoginSearch} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                    <label
-                      htmlFor="login-phone-input"
-                      style={{ fontWeight: "700", color: "var(--text-primary)", fontSize: "0.95rem" }}
-                    >
-                      Parent's Phone Number
-                    </label>
-                    <input
-                      id="login-phone-input"
-                      type="tel"
-                      value={loginPhone}
-                      onChange={(e) => setLoginPhone(e.target.value)}
-                      placeholder="Type phone number here..."
-                      maxLength={15}
-                      style={{
-                        width: "100%",
-                        padding: "10px",
-                        fontSize: "0.95rem",
-                        borderRadius: "12px",
-                        border: "3px solid #cbd5e1",
-                        backgroundColor: "var(--bg-primary)",
-                        color: "var(--text-primary)",
-                        fontWeight: "600",
-                        textAlign: "center"
-                      }}
-                    />
-                  </div>
-                  <ChunkyButton type="submit" variant="secondary" style={{ padding: "12px" }}>
-                    🔍 Find My Profile
-                  </ChunkyButton>
-                </form>
-
-                {hasSearchedLoginPhone && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: "10px", borderTop: "2px solid #e2e8f0", paddingTop: "14px" }}>
-                    <span style={{ fontWeight: "800", color: "var(--text-primary)", fontSize: "0.95rem", textAlign: "center" }}>
-                      {foundStudents.length === 0 
-                        ? "No profiles found with this phone number. Make sure to Join In first! 🦖" 
-                        : "Tap your face to draw pattern lock! 👇"}
+                {!hasSearchedLoginPhone ? (
+                  <form onSubmit={handleLoginSearch} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                      <label
+                        htmlFor="login-phone-input"
+                        style={{ fontWeight: "800", color: "var(--text-primary)", fontSize: "0.95rem" }}
+                      >
+                        Parent's Phone Number 📱
+                      </label>
+                      <input
+                        id="login-phone-input"
+                        type="tel"
+                        value={loginPhone}
+                        onChange={(e) => setLoginPhone(e.target.value)}
+                        placeholder="Type phone number here..."
+                        maxLength={15}
+                        style={{
+                          width: "100%",
+                          padding: "12px",
+                          fontSize: "1rem",
+                          borderRadius: "16px",
+                          border: "3.5px solid #cbd5e1",
+                          backgroundColor: "var(--bg-primary)",
+                          color: "var(--text-primary)",
+                          fontWeight: "800",
+                          textAlign: "center",
+                          outline: "none",
+                          boxShadow: "inset 0 2px 4px rgba(0,0,0,0.06)"
+                        }}
+                      />
+                    </div>
+                    <ChunkyButton type="submit" variant="secondary" style={{ padding: "14px" }}>
+                      🔍 Find My Profile
+                    </ChunkyButton>
+                  </form>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                    <span style={{ fontWeight: "900", color: "var(--text-primary)", fontSize: "1.05rem", textAlign: "center", marginBottom: "4px" }}>
+                      {foundStudents.length === 0
+                        ? "No profiles found! Make sure to Join In first! 🦖"
+                        : "Tap your face to unlock! 👇"}
                     </span>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "10px" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "14px" }}>
                       {foundStudents.map(student => {
                         const avatarInfo = AVATARS.find(a => a.id === student.avatar) || AVATARS[0];
                         return (
@@ -473,33 +498,63 @@ export const Onboarding: React.FC = () => {
                             type="button"
                             onClick={() => handleSelectLoginStudent(student)}
                             style={{
-                              backgroundColor: "#f8fafc",
-                              border: "3px solid #cbd5e1",
-                              borderRadius: "16px",
-                              padding: "10px 4px",
+                              backgroundColor: "#ffffff",
+                              border: `4px solid ${avatarInfo.color || "#e2e8f0"}`,
+                              borderRadius: "24px",
+                              padding: "16px 8px",
                               display: "flex",
                               flexDirection: "column",
                               alignItems: "center",
-                              gap: "4px",
+                              gap: "8px",
                               cursor: "pointer",
-                              transition: "all 0.2s"
+                              boxShadow: `0 8px 0 ${avatarInfo.color || "#cbd5e1"}44`,
+                              transition: "all 0.2s ease-in-out",
+                              position: "relative"
                             }}
                             onMouseEnter={(e) => {
-                              e.currentTarget.style.borderColor = "var(--accent-secondary)";
-                              e.currentTarget.style.transform = "scale(1.05)";
+                              e.currentTarget.style.transform = "translateY(-4px) scale(1.05)";
+                              e.currentTarget.style.boxShadow = `0 12px 0 ${avatarInfo.color || "#cbd5e1"}55`;
                             }}
                             onMouseLeave={(e) => {
-                              e.currentTarget.style.borderColor = "#cbd5e1";
-                              e.currentTarget.style.transform = "scale(1)";
+                              e.currentTarget.style.transform = "translateY(0) scale(1)";
+                              e.currentTarget.style.boxShadow = `0 8px 0 ${avatarInfo.color || "#cbd5e1"}44`;
                             }}
                           >
-                            <span style={{ fontSize: "2.2rem" }}>{avatarInfo.label.split(" ")[0]}</span>
-                            <span style={{ fontWeight: "800", fontSize: "0.8rem", color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", width: "100%", textAlign: "center" }}>
+                            <span style={{ fontSize: "3rem", filter: "drop-shadow(0 4px 6px rgba(0,0,0,0.1))" }}>
+                              {avatarInfo.label.split(" ")[0]}
+                            </span>
+                            <span style={{ fontWeight: "900", fontSize: "0.9rem", color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", width: "100%", textAlign: "center" }}>
                               {student.name}
                             </span>
                           </button>
                         );
                       })}
+                    </div>
+                    
+                    <div style={{ display: "flex", justifyContent: "center", marginTop: "14px" }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          localStorage.removeItem("saved_parent_phone");
+                          setLoginPhone("");
+                          setFoundStudents([]);
+                          setHasSearchedLoginPhone(false);
+                        }}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          color: "var(--text-secondary)",
+                          fontWeight: "800",
+                          fontSize: "0.85rem",
+                          cursor: "pointer",
+                          textDecoration: "underline",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "4px"
+                        }}
+                      >
+                        🔄 Use different phone number
+                      </button>
                     </div>
                   </div>
                 )}

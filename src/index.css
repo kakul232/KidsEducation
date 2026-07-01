@@ -71,13 +71,26 @@ html {
 }
 
 body {
-  background-color: var(--bg-primary);
+  background-color: #e2e8f0;
   color: var(--text-primary);
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   overflow-x: hidden;
   transition: background-color 0.3s, color 0.3s;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  background-color: var(--bg-primary);
+  box-shadow: 0 0 40px rgba(15, 23, 42, 0.08);
+  position: relative;
+  transition: background-color 0.3s;
 }
 
 /* Scrollbar styling */

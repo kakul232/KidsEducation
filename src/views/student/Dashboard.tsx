@@ -216,7 +216,7 @@ export const Dashboard: React.FC = () => {
 
       // Check if request already exists
       const existingRequests = await LocalDB.getFriendRequests(currentStudent.id);
-      const duplicate = existingRequests.find(r => 
+      const duplicate = existingRequests.find(r =>
         (r.senderId === currentStudent.id && r.receiverId === targetStudent.id) ||
         (r.senderId === targetStudent.id && r.receiverId === currentStudent.id)
       );
@@ -306,7 +306,7 @@ export const Dashboard: React.FC = () => {
 
   const handleSendChallenge = async (gameId: string, gameTitle: string) => {
     if (!currentStudent || !activeChallengeFriend) return;
-    
+
     // Find own highscore
     const ownScore = myHighscores.find(hs => hs.gameId === gameId)?.maxCorrect || 0;
 
@@ -401,7 +401,7 @@ export const Dashboard: React.FC = () => {
             gameStars[log.gameId] = (gameStars[log.gameId] || 0) + stars;
           }
         });
-        
+
         Object.keys(gameStars).forEach(gameId => {
           completedMap[gameId] = `⭐ ${gameStars[gameId]} Stars`;
         });
@@ -979,7 +979,7 @@ export const Dashboard: React.FC = () => {
           style={{ width: "100%", padding: "14px", fontSize: "1.05rem", fontWeight: "800", boxShadow: "0 4px 0 #16a34a" }}
         >
           Okay! 🎈
-            </button>
+        </button>
       </KidsModal>
 
       {/* 3. Premium Locked Game Dialog */}
@@ -1134,11 +1134,11 @@ export const Dashboard: React.FC = () => {
         style={{ boxShadow: "0 12px 24px rgba(34, 197, 94, 0.15)" }}
       >
         <div style={{ fontSize: "4.5rem", animation: "kids-wiggle 2s infinite ease-in-out" }}>🐸</div>
-        
+
         <h3 style={{ margin: 0, fontSize: "1.6rem", fontWeight: "900", color: "#166534" }}>
           Frog Uncle's Magic! ✨
         </h3>
-        
+
         <p style={{ color: "#1b6535", fontSize: "1.05rem", fontWeight: "700", margin: 0, lineHeight: "1.5" }}>
           Want to unlock Premium and play games with your friends? <br />
           Ask your parent to call <strong>Frog Uncle</strong>! 📞
@@ -1169,6 +1169,56 @@ export const Dashboard: React.FC = () => {
           <span>📞 Call Frog Uncle</span>
         </a>
 
+        <button
+          onClick={async () => {
+            const studentName = currentStudent?.name || "Student";
+            const studentId = currentStudent?.id || "";
+            const parentPhone = currentStudent?.phone || "0000000000";
+            const firstFour = studentName.replace(/[^a-zA-Z]/g, "").substring(0, 4).toUpperCase() || "STUD";
+            const lastFourPhone = parentPhone.slice(-4);
+            const uniqueHex = Math.floor(Math.random() * 0x10000).toString(16).padStart(4, "0").toUpperCase();
+            const txnId = `TN-${firstFour}-${lastFourPhone}-${uniqueHex}`;
+
+            try {
+              await LocalDB.createPaymentRecord({
+                txnId,
+                studentId,
+                studentName,
+                parentPhone,
+                amount: 50,
+                status: "pending",
+                createdAt: new Date().toISOString()
+              });
+            } catch (err) {
+              console.error("Failed to create payment record:", err);
+            }
+
+            const payUrl = `upi://pay?pa=Q668504716@ybl&am=50&cu=INR&tn=${encodeURIComponent(studentName + " tution Fee")}&tr=${txnId}`;
+            window.location.href = payUrl;
+          }}
+          className="btn"
+          style={{
+            width: "100%",
+            padding: "14px",
+            fontSize: "1.1rem",
+            fontWeight: "900",
+            backgroundColor: "#4f46e5",
+            borderColor: "#4338ca",
+            color: "#ffffff",
+            borderRadius: "16px",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "8px",
+            boxShadow: "0 4px 0 #4338ca",
+            border: "none",
+            cursor: "pointer",
+            marginTop: "4px"
+          }}
+        >
+          <span>💳 Pay Tuition Fee to Extend</span>
+        </button>
+
         <div style={{ display: "flex", gap: "10px", width: "100%", marginTop: "8px" }}>
           <button
             onClick={() => setShowFrogModal(false)}
@@ -1197,11 +1247,11 @@ export const Dashboard: React.FC = () => {
         style={{ boxShadow: "0 12px 24px rgba(59, 130, 246, 0.2)" }}
       >
         <div style={{ fontSize: "4.5rem", animation: "bounce 2s infinite" }}>🎁</div>
-        
+
         <h3 style={{ margin: 0, fontSize: "1.6rem", fontWeight: "900", color: "#1e3a8a" }}>
           Try Premium Free! 🌟
         </h3>
-        
+
         <p style={{ color: "#1e40af", fontSize: "1.05rem", fontWeight: "700", margin: 0, lineHeight: "1.5" }}>
           Hey {currentStudent?.name || "there"}! <br />
           Activate your <strong>7-Day Free Trial</strong> to play custom games, challenge friends, and see high scores!

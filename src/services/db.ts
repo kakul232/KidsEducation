@@ -73,6 +73,18 @@ export interface FriendRequest {
   status: "pending" | "accepted";
   createdAt: string;
 }
+
+export interface PaymentRecord {
+  id: string;
+  txnId: string;
+  studentId: string;
+  studentName: string;
+  parentPhone: string;
+  amount: number;
+  status: "pending" | "paid";
+  createdAt: string;
+  processedAt?: string;
+}
 export interface Challenge {
   id: string;
   type: "challenge" | "flex";
@@ -925,6 +937,67 @@ export const LocalDB = {
       await deleteDoc(doc(db, "challenges", challengeId));
     } catch (e) {
       console.error("Firestore deleteChallenge failed", e);
+      throw e;
+    }
+  },
+
+  async createPaymentRecord(payment: Omit<PaymentRecord, "id"> & { id?: string }): Promise<PaymentRecord> {
+    try {
+      const id = payment.id || "pay_" + Math.random().toString(36).substr(2, 9);
+      const record: PaymentRecord = {
+        ...payment,
+        id
+      };
+      await setDoc(doc(db, "payments", id), record);
+      return record;
+    } catch (e) {
+      console.error("Firestore createPaymentRecord failed", e);
+      throw e;
+    }
+  },
+
+  async getAllPaymentRecords(): Promise<PaymentRecord[]> {
+    try {
+      const snap = await getDocs(collection(db, "payments"));
+      const list: PaymentRecord[] = [];
+      snap.forEach(doc => list.push(doc.data() as PaymentRecord));
+      return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } catch (e) {
+      console.error("Firestore getAllPaymentRecords failed", e);
+      return [];
+    }
+  },
+
+  async approvePayment(paymentId: string): Promise<void> {
+    try {
+      const docRef = doc(db, "payments", paymentId);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        const payment = snap.data() as PaymentRecord;
+        const updatedPayment: PaymentRecord = {
+          ...payment,
+          status: "paid",
+          processedAt: new Date().toISOString()
+        };
+        await setDoc(docRef, updatedPayment);
+
+        const studentRef = doc(db, "students", payment.studentId);
+        const studentSnap = await getDoc(studentRef);
+        if (studentSnap.exists()) {
+          const student = studentSnap.data() as Student;
+          const currentExp = student.validUntil ? new Date(student.validUntil) : new Date();
+          const baseDate = currentExp > new Date() ? currentExp : new Date();
+          const newExp = new Date(baseDate.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
+          
+          await setDoc(studentRef, {
+            ...student,
+            tier: "paid",
+            validUntil: newExp
+          });
+        }
+      }
+    } catch (e) {
+      console.error("Firestore approvePayment failed", e);
       throw e;
     }
   }

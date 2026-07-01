@@ -50,10 +50,10 @@ export const PatternLock: React.FC<PatternLockProps> = ({
   const getRelativeCoords = (e: MouseEvent | TouchEvent | React.MouseEvent | React.TouchEvent) => {
     if (!containerRef.current) return null;
     const rect = containerRef.current.getBoundingClientRect();
-    
+
     let clientX = 0;
     let clientY = 0;
-    
+
     if ("touches" in e) {
       if (e.touches.length === 0) return null;
       clientX = e.touches[0].clientX;
@@ -62,11 +62,11 @@ export const PatternLock: React.FC<PatternLockProps> = ({
       clientX = e.clientX;
       clientY = e.clientY;
     }
-    
+
     // Scale pointer coordinate if container size is different from 300px
     const x = ((clientX - rect.left) / rect.width) * 300;
     const y = ((clientY - rect.top) / rect.height) * 300;
-    
+
     return { x, y };
   };
 
@@ -162,7 +162,7 @@ export const PatternLock: React.FC<PatternLockProps> = ({
         handleMove(e);
       }
     };
-    
+
     const onGlobalEnd = () => {
       if (isDrawing) {
         handleEnd();
@@ -189,8 +189,8 @@ export const PatternLock: React.FC<PatternLockProps> = ({
     setSuccessMsg("");
   };
 
-  const defaultTitle = mode === "set" 
-    ? (firstPattern ? "Confirm Pattern Lock" : "Create Pattern Lock") 
+  const defaultTitle = mode === "set"
+    ? (firstPattern ? "Confirm Pattern Lock" : "Create Pattern Lock")
     : "Enter Pattern Lock";
 
   return (
@@ -198,7 +198,7 @@ export const PatternLock: React.FC<PatternLockProps> = ({
       <h3 style={{ margin: 0, fontSize: "1.2rem", color: "var(--text-primary)", textAlign: "center" }}>
         {title || defaultTitle}
       </h3>
-      
+
       {mode === "set" && !firstPattern && (
         <span style={{ fontSize: "0.85rem", color: "var(--text-secondary)", textAlign: "center", marginTop: "-10px" }}>
           (Connect 3 or more dots to lock your profile)
@@ -206,7 +206,7 @@ export const PatternLock: React.FC<PatternLockProps> = ({
       )}
 
       {/* SVG Canvas Container */}
-      <div 
+      <div
         ref={containerRef}
         onMouseDown={handleStart}
         onTouchStart={handleStart}
@@ -223,7 +223,7 @@ export const PatternLock: React.FC<PatternLockProps> = ({
           userSelect: "none"
         }}
       >
-        <svg 
+        <svg
           style={{
             width: "100%",
             height: "100%",
@@ -280,7 +280,7 @@ export const PatternLock: React.FC<PatternLockProps> = ({
                     style={{ opacity: 0.15, transformOrigin: `${coord.x}px ${coord.y}px`, animation: "ping 1.5s infinite" }}
                   />
                 )}
-                
+
                 {/* Outer ring */}
                 <circle
                   cx={coord.x}
@@ -313,7 +313,7 @@ export const PatternLock: React.FC<PatternLockProps> = ({
             ⚠️ {error}
           </span>
         )}
-        
+
         {successMsg && (
           <span style={{ color: "var(--success)", fontWeight: "700", fontSize: "0.9rem", textAlign: "center" }}>
             ✨ {successMsg}
@@ -336,7 +336,7 @@ export const PatternLock: React.FC<PatternLockProps> = ({
           >
             Clear Drawing
           </button>
-          
+
           {onCancel && (
             <button
               type="button"
