@@ -38,5 +38,15 @@ service cloud.firestore {
       allow create: if true;
       allow read, update, delete: if request.auth != null;
     }
+
+    // 7. Friend Requests collection: Anyone can read/write for social features
+    match /friend_requests/{requestId} {
+      allow read, write: if true;
+    }
+
+    // 8. Challenges collection: Anyone can read/write for challenge and flex records
+    match /challenges/{challengeId} {
+      allow read, write: if true;
+    }
   }
 }

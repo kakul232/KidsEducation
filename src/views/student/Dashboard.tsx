@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useApp } from "../../context/AppContext";
 import LocalDB from "../../services/db";
-import type { Game, ActivityLog } from "../../services/db";
+import type { Game, ActivityLog, FriendRequest, Student, Challenge } from "../../services/db";
 import { Trophy, Play, Lock, Send } from "lucide-react";
 import { SUBJECTS } from "../../utils/constants";
 import { AvatarIcon } from "../../components/AvatarIcon";
@@ -29,7 +29,7 @@ const parseGameTitle = (fullTitle: string) => {
 };
 
 export const Dashboard: React.FC = () => {
-  const { currentStudent, setPlayingGame, installPrompt, triggerInstall, notiPermission, requestNotiPermission, speakText } = useApp();
+  const { currentStudent, updateStudent, setPlayingGame, installPrompt, triggerInstall, notiPermission, requestNotiPermission, speakText } = useApp();
   const [games, setGames] = useState<Game[]>([]);
   const [selectedSubject, setSelectedSubject] = useState("math");
   const [completedGames, setCompletedGames] = useState<Record<string, string>>({});
@@ -47,6 +47,293 @@ export const Dashboard: React.FC = () => {
   const [lockedReason, setLockedReason] = useState<"premium" | "stars">("premium");
   const [lockedStarsRequired, setLockedStarsRequired] = useState(0);
   const [showIdeaSuccess, setShowIdeaSuccess] = useState(false);
+
+  // Social/Friends Hub states
+  const [activeTab, setActiveTab] = useState<"games" | "friends">("games");
+  const [friendPhone, setFriendPhone] = useState("");
+  const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
+  const [friendsList, setFriendsList] = useState<Student[]>([]);
+  const [friendLogs, setFriendLogs] = useState<Record<string, ActivityLog[]>>({});
+  const [expandedFriendId, setExpandedFriendId] = useState<string | null>(null);
+  const [isSearchingFriend, setIsSearchingFriend] = useState(false);
+  const [socialError, setSocialError] = useState("");
+  const [socialSuccess, setSocialSuccess] = useState("");
+  const [isUpgrading, setIsUpgrading] = useState(false);
+
+  // Challenge & Flexing States
+  const [challenges, setChallenges] = useState<Challenge[]>([]);
+  const [myHighscores, setMyHighscores] = useState<{ gameId: string; title: string; maxCorrect: number }[]>([]);
+  const [activeFlexGame, setActiveFlexGame] = useState<{ gameId: string; title: string; score: number } | null>(null);
+  const [showFlexModal, setShowFlexModal] = useState(false);
+  const [activeChallengeFriend, setActiveChallengeFriend] = useState<Student | null>(null);
+  const [showChallengeModal, setShowChallengeModal] = useState(false);
+
+  const fetchSocialData = async () => {
+    if (!currentStudent) return;
+    try {
+      const requests = await LocalDB.getFriendRequests(currentStudent.id);
+      setFriendRequests(requests);
+
+      // Find accepted friendships
+      const acceptedRequests = requests.filter(r => r.status === "accepted");
+      const friendIds = Array.from(new Set(
+        acceptedRequests.map(r => r.senderId === currentStudent.id ? r.receiverId : r.senderId)
+      ));
+
+      // Fetch student details for all friends
+      const friendsDetails = await Promise.all(
+        friendIds.map(id => LocalDB.getStudent(id))
+      );
+      // Filter out undefined
+      const validFriends = friendsDetails.filter((s): s is Student => !!s);
+      setFriendsList(validFriends);
+
+      // Fetch logs of friends if current student is paid
+      if (currentStudent.tier === "paid") {
+        const logsMap: Record<string, ActivityLog[]> = {};
+        await Promise.all(
+          validFriends.map(async (friend) => {
+            const logs = await LocalDB.getStudentLogs(friend.id);
+            logsMap[friend.id] = logs;
+          })
+        );
+        setFriendLogs(logsMap);
+
+        // Fetch own logs & compute highscores
+        const myLogs = await LocalDB.getStudentLogs(currentStudent.id);
+        const myHighscoresMap: Record<string, { gameId: string; title: string; maxCorrect: number }> = {};
+        myLogs.forEach(log => {
+          if (!myHighscoresMap[log.gameId]) {
+            myHighscoresMap[log.gameId] = {
+              gameId: log.gameId,
+              title: log.gameTitle,
+              maxCorrect: log.correctAnswers
+            };
+          } else {
+            myHighscoresMap[log.gameId].maxCorrect = Math.max(myHighscoresMap[log.gameId].maxCorrect, log.correctAnswers);
+          }
+        });
+        setMyHighscores(Object.values(myHighscoresMap));
+
+        // Fetch challenges
+        const challs = await LocalDB.getChallenges(currentStudent.id);
+        setChallenges(challs);
+      }
+    } catch (err) {
+      console.warn("Failed to fetch social data:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (currentStudent) {
+      fetchSocialData();
+    }
+  }, [currentStudent]);
+
+  const handleUpgradeToPremium = async () => {
+    if (!currentStudent) return;
+    setIsUpgrading(true);
+    try {
+      const updated: Student = {
+        ...currentStudent,
+        tier: "paid"
+      };
+      await updateStudent(updated);
+      speakText("Hooray! You are now a premium learner! Let's connect with your friends!");
+      setSocialSuccess("Successfully upgraded to Premium! 💎");
+      setTimeout(() => setSocialSuccess(""), 4000);
+    } catch (err) {
+      console.error("Failed to upgrade student:", err);
+      setSocialError("Failed to simulate upgrade. Try again!");
+    } finally {
+      setIsUpgrading(false);
+    }
+  };
+
+  const handleSendFriendRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentStudent) return;
+    if (currentStudent.tier !== "paid") {
+      setSocialError("Only Premium/Paid users can send friend requests!");
+      speakText("Ask your parent to upgrade your account to send friend requests!");
+      return;
+    }
+
+    const targetPhone = friendPhone.trim();
+    if (!targetPhone) {
+      setSocialError("Please enter a valid phone number!");
+      return;
+    }
+
+    if (targetPhone === currentStudent.phone) {
+      setSocialError("You cannot send a friend request to yourself!");
+      speakText("You cannot send a request to your own number!");
+      return;
+    }
+
+    setIsSearchingFriend(true);
+    setSocialError("");
+    setSocialSuccess("");
+
+    try {
+      const targetStudent = await LocalDB.getStudentByPhone(targetPhone);
+      if (!targetStudent) {
+        setSocialError("No student registered with this parent's phone number!");
+        speakText("We couldn't find a friend with that phone number.");
+        setIsSearchingFriend(false);
+        return;
+      }
+
+      if (targetStudent.id === currentStudent.id) {
+        setSocialError("You cannot send a friend request to yourself!");
+        speakText("You cannot send a request to your own profile.");
+        setIsSearchingFriend(false);
+        return;
+      }
+
+      // Check if request already exists
+      const existingRequests = await LocalDB.getFriendRequests(currentStudent.id);
+      const duplicate = existingRequests.find(r => 
+        (r.senderId === currentStudent.id && r.receiverId === targetStudent.id) ||
+        (r.senderId === targetStudent.id && r.receiverId === currentStudent.id)
+      );
+
+      if (duplicate) {
+        if (duplicate.status === "accepted") {
+          setSocialError(`You are already friends with ${targetStudent.name}!`);
+          speakText(`You are already friends with ${targetStudent.name}!`);
+        } else {
+          setSocialError(`A pending request already exists with ${targetStudent.name}!`);
+          speakText(`A friend request is already pending with ${targetStudent.name}.`);
+        }
+        setIsSearchingFriend(false);
+        return;
+      }
+
+      await LocalDB.sendFriendRequest(currentStudent, targetStudent);
+      setSocialSuccess(`Yay! Friend request sent to ${targetStudent.name}! 🚀`);
+      speakText(`Friend request sent to ${targetStudent.name}!`);
+      setFriendPhone("");
+      fetchSocialData();
+    } catch (err) {
+      console.error("Failed to send friend request:", err);
+      setSocialError("Oops, something went wrong sending the request.");
+    } finally {
+      setIsSearchingFriend(false);
+    }
+  };
+
+  const handleAcceptRequest = async (requestId: string, senderName: string) => {
+    try {
+      await LocalDB.acceptFriendRequest(requestId);
+      setSocialSuccess(`Awesome! You accepted ${senderName}'s request!`);
+      speakText(`You are now friends with ${senderName}!`);
+      fetchSocialData();
+    } catch (err) {
+      console.error("Failed to accept request:", err);
+      setSocialError("Failed to accept friend request.");
+    }
+  };
+
+  const handleDeclineRequest = async (requestId: string, name: string, isFriend: boolean = false) => {
+    try {
+      await LocalDB.deleteFriendRequest(requestId);
+      if (isFriend) {
+        setSocialSuccess(`Removed ${name} from friends.`);
+        speakText(`Removed ${name} from your friends list.`);
+      } else {
+        setSocialSuccess(`Declined request from ${name}.`);
+        speakText(`Declined request.`);
+      }
+      fetchSocialData();
+      if (expandedFriendId === name) setExpandedFriendId(null);
+    } catch (err) {
+      console.error("Failed to delete request:", err);
+      setSocialError("Failed to perform action.");
+    }
+  };
+
+  const handleFlexScore = async (friendId: string, friendName: string) => {
+    if (!currentStudent || !activeFlexGame) return;
+    try {
+      const flexId = "flex_" + Math.random().toString(36).substr(2, 9);
+      const flex: Challenge = {
+        id: flexId,
+        type: "flex",
+        senderId: currentStudent.id,
+        senderName: currentStudent.name,
+        receiverId: friendId,
+        receiverName: friendName,
+        gameId: activeFlexGame.gameId,
+        gameTitle: activeFlexGame.title,
+        senderScore: activeFlexGame.score,
+        status: "pending",
+        createdAt: new Date().toISOString()
+      };
+      await LocalDB.sendChallenge(flex);
+      setSocialSuccess(`Flexed your score of ${activeFlexGame.score} in ${activeFlexGame.title} with ${friendName}! 💪`);
+      speakText(`Flexed your score with ${friendName}!`);
+      setShowFlexModal(false);
+      fetchSocialData();
+    } catch (err) {
+      console.error("Failed to flex score:", err);
+      setSocialError("Failed to flex score with friend.");
+    }
+  };
+
+  const handleSendChallenge = async (gameId: string, gameTitle: string) => {
+    if (!currentStudent || !activeChallengeFriend) return;
+    
+    // Find own highscore
+    const ownScore = myHighscores.find(hs => hs.gameId === gameId)?.maxCorrect || 0;
+
+    try {
+      const challengeId = "chall_" + Math.random().toString(36).substr(2, 9);
+      const challenge: Challenge = {
+        id: challengeId,
+        type: "challenge",
+        senderId: currentStudent.id,
+        senderName: currentStudent.name,
+        receiverId: activeChallengeFriend.id,
+        receiverName: activeChallengeFriend.name,
+        gameId,
+        gameTitle,
+        senderScore: ownScore,
+        status: "pending",
+        createdAt: new Date().toISOString()
+      };
+      await LocalDB.sendChallenge(challenge);
+      setSocialSuccess(`Challenged ${activeChallengeFriend.name} to play ${gameTitle}! ⚔️`);
+      speakText(`Challenged ${activeChallengeFriend.name} to a game!`);
+      setShowChallengeModal(false);
+      fetchSocialData();
+    } catch (err) {
+      console.error("Failed to send challenge:", err);
+      setSocialError("Failed to send challenge to friend.");
+    }
+  };
+
+  const handlePlayChallenge = (challenge: Challenge) => {
+    const game = games.find(g => g.id === challenge.gameId);
+    if (!game) {
+      alert("Oops! This game is not currently available or published.");
+      return;
+    }
+    localStorage.setItem("active_challenge_id", challenge.id);
+    localStorage.setItem("active_challenge_sender_score", challenge.senderScore.toString());
+    localStorage.setItem("active_challenge_sender_name", challenge.senderName);
+    setPlayingGame(game);
+  };
+
+  const handleDismissChallenge = async (challengeId: string) => {
+    try {
+      await LocalDB.deleteChallenge(challengeId);
+      setSocialSuccess("Notification cleared.");
+      fetchSocialData();
+    } catch (err) {
+      console.error("Failed to clear notification:", err);
+    }
+  };
 
   useEffect(() => {
     // 1. Helper to render games & logs from a given data set
@@ -336,8 +623,81 @@ export const Dashboard: React.FC = () => {
         </div>
       </PlayCard>
 
-      {/* Custom Add to Homescreen install prompt for PWA support */}
-      {installPrompt && (
+      {/* Segmented Tab Controller for Games vs Friends */}
+      <div
+        style={{
+          display: "flex",
+          backgroundColor: "#f1f5f9",
+          borderRadius: "16px",
+          padding: "6px",
+          marginBottom: "20px",
+          border: "2px solid #cbd5e1"
+        }}
+      >
+        <button
+          onClick={() => setActiveTab("games")}
+          style={{
+            flex: 1,
+            padding: "12px 16px",
+            fontSize: "1.05rem",
+            fontWeight: "800",
+            borderRadius: "12px",
+            border: "none",
+            backgroundColor: activeTab === "games" ? "var(--accent-primary)" : "transparent",
+            color: activeTab === "games" ? "#ffffff" : "#475569",
+            cursor: "pointer",
+            transition: "all 0.2s ease",
+            boxShadow: activeTab === "games" ? "0 4px 6px rgba(79, 70, 229, 0.2)" : "none"
+          }}
+        >
+          🎮 Play Games
+        </button>
+        <button
+          onClick={() => setActiveTab("friends")}
+          style={{
+            flex: 1,
+            padding: "12px 16px",
+            fontSize: "1.05rem",
+            fontWeight: "800",
+            borderRadius: "12px",
+            border: "none",
+            backgroundColor: activeTab === "friends" ? "var(--accent-primary)" : "transparent",
+            color: activeTab === "friends" ? "#ffffff" : "#475569",
+            cursor: "pointer",
+            transition: "all 0.2s ease",
+            boxShadow: activeTab === "friends" ? "0 4px 6px rgba(79, 70, 229, 0.2)" : "none",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "6px"
+          }}
+        >
+          <span>🤝 Friends Hub</span>
+          {friendRequests.filter(r => r.receiverId === currentStudent?.id && r.status === "pending").length > 0 && (
+            <span
+              style={{
+                backgroundColor: "#ef4444",
+                color: "#ffffff",
+                borderRadius: "50%",
+                width: "20px",
+                height: "20px",
+                fontSize: "0.75rem",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontWeight: "900"
+              }}
+            >
+              {friendRequests.filter(r => r.receiverId === currentStudent?.id && r.status === "pending").length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {activeTab === "games" && (
+        <>
+          {/* Custom Add to Homescreen install prompt for PWA support */}
+          {installPrompt && (
         <PlayCard
           style={{
             display: "flex",
@@ -815,6 +1175,721 @@ export const Dashboard: React.FC = () => {
           </div>
         )}
       </div>
+      </>
+      )}
+
+      {/* Friends Hub Panel */}
+      {activeTab === "friends" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+          
+          {/* Social Alert Banner (Error/Success messages) */}
+          {(socialError || socialSuccess) && (
+            <PlayCard
+              style={{
+                padding: "12px 18px",
+                backgroundColor: socialError ? "#fef2f2" : "#f0fdf4",
+                borderColor: socialError ? "#fca5a5" : "#86efac",
+                borderWidth: "2.5px",
+                borderStyle: "solid",
+                borderRadius: "16px",
+                boxShadow: `0 4px 0 ${socialError ? "#ef4444" : "#10b981"}`
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <span style={{ fontSize: "1.5rem" }}>{socialError ? "⚠️" : "🎉"}</span>
+                <span
+                  style={{
+                    fontSize: "0.95rem",
+                    fontWeight: "700",
+                    color: socialError ? "#b91c1c" : "#15803d"
+                  }}
+                >
+                  {socialError || socialSuccess}
+                </span>
+              </div>
+            </PlayCard>
+          )}
+
+          {/* Premium Tier Status Card */}
+          <PlayCard
+            style={{
+              padding: "20px",
+              backgroundColor: "var(--bg-secondary)",
+              borderColor: currentStudent?.tier === "paid" ? "#cbd5e1" : "#fca5a5",
+              borderWidth: "3px",
+              borderStyle: currentStudent?.tier === "paid" ? "solid" : "dashed",
+              borderRadius: "20px",
+              boxShadow: "0 6px 0 rgba(0,0,0,0.03)"
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <span style={{ fontSize: "2.5rem" }}>{currentStudent?.tier === "paid" ? "💎" : "🆓"}</span>
+                <div style={{ textAlign: "left" }}>
+                  <h4 style={{ margin: 0, fontSize: "1.15rem", fontWeight: "900", color: "var(--text-primary)" }}>
+                    Account Tier: {currentStudent?.tier === "paid" ? "Premium Learner" : "Free Learner"}
+                  </h4>
+                  <p style={{ margin: "4px 0 0 0", fontSize: "0.85rem", color: "var(--text-secondary)", fontWeight: "600" }}>
+                    {currentStudent?.tier === "paid"
+                      ? "You have full access to send requests & view friends' game scores! 🚀"
+                      : "Upgrade to premium to send requests & see friends' highscores! ✨"}
+                  </p>
+                </div>
+              </div>
+              
+              {currentStudent?.tier !== "paid" && (
+                <button
+                  onClick={handleUpgradeToPremium}
+                  disabled={isUpgrading}
+                  className="btn btn-success animate-tag-pulse"
+                  style={{
+                    padding: "10px 18px",
+                    fontSize: "0.9rem",
+                    fontWeight: "800",
+                    borderRadius: "12px",
+                    boxShadow: "0 4px 0 #16a34a",
+                    border: "none",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px"
+                  }}
+                >
+                  <span>💎 Upgrade Now (Simulated)</span>
+                </button>
+              )}
+            </div>
+          </PlayCard>
+
+          {/* Add Friend Panel */}
+          <PlayCard style={{ padding: "20px", borderRadius: "20px" }}>
+            <h4 style={{ margin: "0 0 12px 0", fontSize: "1.1rem", fontWeight: "900", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "8px" }}>
+              <span>➕ Add a Buddy</span>
+            </h4>
+            
+            <form onSubmit={handleSendFriendRequest} style={{ display: "flex", gap: "10px", alignItems: "stretch", flexWrap: "wrap" }}>
+              <input
+                type="tel"
+                value={friendPhone}
+                onChange={(e) => setFriendPhone(e.target.value)}
+                placeholder="Enter parent's phone number (e.g. 1234567890)"
+                disabled={currentStudent?.tier !== "paid" || isSearchingFriend}
+                style={{
+                  flex: 1,
+                  minWidth: "200px",
+                  padding: "12px 16px",
+                  fontSize: "1rem",
+                  borderRadius: "12px",
+                  border: "3.5px solid #cbd5e1",
+                  fontWeight: "600",
+                  backgroundColor: currentStudent?.tier === "paid" ? "var(--bg-primary)" : "#f1f5f9",
+                  color: "var(--text-primary)"
+                }}
+              />
+              <button
+                type="submit"
+                disabled={currentStudent?.tier !== "paid" || isSearchingFriend || !friendPhone.trim()}
+                className="btn btn-primary"
+                style={{
+                  padding: "12px 24px",
+                  fontSize: "1rem",
+                  fontWeight: "800",
+                  borderRadius: "12px",
+                  boxShadow: "0 4px 0 var(--accent-secondary)",
+                  border: "none",
+                  cursor: (currentStudent?.tier !== "paid" || isSearchingFriend || !friendPhone.trim()) ? "not-allowed" : "pointer"
+                }}
+              >
+                {isSearchingFriend ? "Searching..." : "Send Request 🚀"}
+              </button>
+            </form>
+            {currentStudent?.tier !== "paid" && (
+              <p style={{ margin: "8px 0 0 0", fontSize: "0.8rem", color: "#ef4444", fontWeight: "700" }}>
+                🔒 Upgrading to Premium is required to invite friends by phone number.
+              </p>
+            )}
+          </PlayCard>
+
+          {/* Pending Requests Panel */}
+          {(friendRequests.filter(r => r.status === "pending").length > 0) && (
+            <PlayCard style={{ padding: "20px", borderRadius: "20px" }}>
+              <h4 style={{ margin: "0 0 16px 0", fontSize: "1.1rem", fontWeight: "900", color: "var(--text-primary)" }}>
+                🔔 Pending Requests
+              </h4>
+              
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                {/* Received Requests */}
+                {friendRequests.filter(r => r.receiverId === currentStudent?.id && r.status === "pending").map(req => (
+                  <div
+                    key={req.id}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      backgroundColor: "var(--bg-primary)",
+                      border: "2px solid #e2e8f0",
+                      borderRadius: "14px",
+                      padding: "12px 16px",
+                      flexWrap: "wrap",
+                      gap: "10px"
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <span style={{ fontSize: "1.5rem" }}>👋</span>
+                      <div style={{ textAlign: "left" }}>
+                        <strong style={{ fontSize: "0.95rem" }}>{req.senderName}</strong> wants to be friends!
+                        <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>Phone: {req.senderPhone || "N/A"}</div>
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <button
+                        onClick={() => handleAcceptRequest(req.id, req.senderName)}
+                        className="btn btn-success"
+                        style={{ padding: "8px 14px", fontSize: "0.85rem", borderRadius: "10px", border: "none", cursor: "pointer", boxShadow: "0 3px 0 #16a34a" }}
+                      >
+                        Accept ✔
+                      </button>
+                      <button
+                        onClick={() => handleDeclineRequest(req.id, req.senderName)}
+                        style={{
+                          padding: "8px 14px",
+                          fontSize: "0.85rem",
+                          borderRadius: "10px",
+                          border: "2px solid #fca5a5",
+                          backgroundColor: "#fee2e2",
+                          color: "#b91c1c",
+                          fontWeight: "800",
+                          cursor: "pointer",
+                          boxShadow: "0 3px 0 #ef4444"
+                        }}
+                      >
+                        Decline ✖
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Sent Requests */}
+                {friendRequests.filter(r => r.senderId === currentStudent?.id && r.status === "pending").map(req => (
+                  <div
+                    key={req.id}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      backgroundColor: "var(--bg-primary)",
+                      border: "2px solid #e2e8f0",
+                      borderRadius: "14px",
+                      padding: "12px 16px",
+                      flexWrap: "wrap",
+                      gap: "10px"
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <span style={{ fontSize: "1.3rem" }}>✉</span>
+                      <div style={{ textAlign: "left" }}>
+                        Sent request to <strong style={{ fontSize: "0.95rem" }}>{req.receiverName}</strong>
+                        <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>Phone: {req.receiverPhone || "N/A"}</div>
+                      </div>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: "0.8rem", color: "#b45309", backgroundColor: "#fffbeb", padding: "4px 8px", borderRadius: "8px", fontWeight: "800", marginRight: "8px" }}>
+                        Waiting... ⌛
+                      </span>
+                      <button
+                        onClick={() => handleDeclineRequest(req.id, req.receiverName)}
+                        style={{
+                          padding: "6px 10px",
+                          fontSize: "0.8rem",
+                          borderRadius: "8px",
+                          border: "1.5px solid #cbd5e1",
+                          backgroundColor: "#f1f5f9",
+                          color: "#475569",
+                          fontWeight: "800",
+                          cursor: "pointer"
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </PlayCard>
+          )}
+
+          {/* Challenge & Flex Notifications Inbox */}
+          {challenges.length > 0 && (
+            <PlayCard style={{ padding: "20px", borderRadius: "20px" }}>
+              <h4 style={{ margin: "0 0 16px 0", fontSize: "1.1rem", fontWeight: "900", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "8px" }}>
+                <span>📬 Social Inbox</span>
+              </h4>
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                {challenges.map(chall => {
+                  const isReceived = chall.receiverId === currentStudent?.id;
+                  
+                  if (chall.type === "flex") {
+                    if (isReceived) {
+                      return (
+                        <div
+                          key={chall.id}
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            backgroundColor: "#f0fdf4",
+                            border: "2.5px solid #86efac",
+                            borderRadius: "14px",
+                            padding: "12px 16px",
+                            flexWrap: "wrap",
+                            gap: "10px"
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            <span style={{ fontSize: "1.5rem" }}>💪</span>
+                            <div style={{ textAlign: "left" }}>
+                              <strong>{chall.senderName}</strong> flexed a score of <strong>{chall.senderScore}</strong> correct in <strong>{chall.gameTitle}</strong>! Can you beat it? 🏆
+                              <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>Sent: {new Date(chall.createdAt).toLocaleTimeString()}</div>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleDismissChallenge(chall.id)}
+                            style={{
+                              padding: "6px 12px",
+                              fontSize: "0.8rem",
+                              borderRadius: "8px",
+                              border: "1.5px solid #cbd5e1",
+                              backgroundColor: "#ffffff",
+                              color: "#475569",
+                              fontWeight: "800",
+                              cursor: "pointer"
+                            }}
+                          >
+                            Cool! 👍
+                          </button>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }
+
+                  // It is a challenge
+                  if (isReceived) {
+                    if (chall.status === "pending") {
+                      return (
+                        <div
+                          key={chall.id}
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            backgroundColor: "#eff6ff",
+                            border: "2.5px solid #bfdbfe",
+                            borderRadius: "14px",
+                            padding: "12px 16px",
+                            flexWrap: "wrap",
+                            gap: "10px"
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            <span style={{ fontSize: "1.5rem" }}>⚔️</span>
+                            <div style={{ textAlign: "left" }}>
+                              <strong>{chall.senderName}</strong> challenged you to beat their score of <strong>{chall.senderScore}</strong> correct in <strong>{chall.gameTitle}</strong>!
+                              <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>Sent: {new Date(chall.createdAt).toLocaleTimeString()}</div>
+                            </div>
+                          </div>
+                          <div style={{ display: "flex", gap: "8px" }}>
+                            <button
+                              onClick={() => handlePlayChallenge(chall)}
+                              className="btn btn-primary animate-tag-pulse"
+                              style={{ padding: "8px 14px", fontSize: "0.85rem", borderRadius: "10px", border: "none", cursor: "pointer", boxShadow: "0 3px 0 var(--accent-secondary)" }}
+                            >
+                              Play & Beat it! 🎮
+                            </button>
+                            <button
+                              onClick={() => handleDismissChallenge(chall.id)}
+                              style={{
+                                padding: "8px 14px",
+                                fontSize: "0.85rem",
+                                borderRadius: "10px",
+                                border: "1.5px solid #cbd5e1",
+                                backgroundColor: "#ffffff",
+                                color: "#475569",
+                                fontWeight: "800",
+                                cursor: "pointer"
+                              }}
+                            >
+                              Ignore
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    } else if (chall.status === "completed") {
+                      const receiverBeatSender = (chall.receiverScore || 0) >= chall.senderScore;
+                      return (
+                        <div
+                          key={chall.id}
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            backgroundColor: receiverBeatSender ? "#ecfdf5" : "#fff5f5",
+                            border: receiverBeatSender ? "2.5px solid #a7f3d0" : "2.5px solid #fecaca",
+                            borderRadius: "14px",
+                            padding: "12px 16px",
+                            flexWrap: "wrap",
+                            gap: "10px"
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            <span style={{ fontSize: "1.5rem" }}>{receiverBeatSender ? "🏆" : "🧸"}</span>
+                            <div style={{ textAlign: "left" }}>
+                              {receiverBeatSender ? (
+                                <span>You beat <strong>{chall.senderName}</strong>'s challenge! (You scored <strong>{chall.receiverScore}</strong>, beating their score of <strong>{chall.senderScore}</strong> in <strong>{chall.gameTitle}</strong>!) 🎉</span>
+                              ) : (
+                                <span>You played <strong>{chall.senderName}</strong>'s challenge. (You scored <strong>{chall.receiverScore}</strong>. They scored <strong>{chall.senderScore}</strong> in <strong>{chall.gameTitle}</strong>). Keep practicing! 😊</span>
+                              )}
+                              <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>Completed: {new Date(chall.createdAt).toLocaleDateString()}</div>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleDismissChallenge(chall.id)}
+                            style={{
+                              padding: "6px 12px",
+                              fontSize: "0.8rem",
+                              borderRadius: "8px",
+                              border: "1.5px solid #cbd5e1",
+                              backgroundColor: "#ffffff",
+                              color: "#475569",
+                              fontWeight: "800",
+                              cursor: "pointer"
+                            }}
+                          >
+                            Dismiss
+                          </button>
+                        </div>
+                      );
+                    }
+                  } else {
+                    // Sent challenges updates
+                    if (chall.status === "completed") {
+                      const receiverBeatSender = (chall.receiverScore || 0) >= chall.senderScore;
+                      return (
+                        <div
+                          key={chall.id}
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            backgroundColor: "#faf5ff",
+                            border: "2.5px solid #e9d5ff",
+                            borderRadius: "14px",
+                            padding: "12px 16px",
+                            flexWrap: "wrap",
+                            gap: "10px"
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            <span style={{ fontSize: "1.5rem" }}>🏁</span>
+                            <div style={{ textAlign: "left" }}>
+                              <strong>{chall.receiverName}</strong> completed your challenge in <strong>{chall.gameTitle}</strong>!<br />
+                              Score details: {chall.receiverName}: <strong>{chall.receiverScore}</strong> vs You: <strong>{chall.senderScore}</strong>.
+                              {receiverBeatSender ? " They beat your score! 😮" : " You stayed ahead! 😎"}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleDismissChallenge(chall.id)}
+                            style={{
+                              padding: "6px 12px",
+                              fontSize: "0.8rem",
+                              borderRadius: "8px",
+                              border: "1.5px solid #cbd5e1",
+                              backgroundColor: "#ffffff",
+                              color: "#475569",
+                              fontWeight: "800",
+                              cursor: "pointer"
+                            }}
+                          >
+                            Dismiss
+                          </button>
+                        </div>
+                      );
+                    }
+                  }
+                  return null;
+                })}
+              </div>
+            </PlayCard>
+          )}
+
+          {/* My Own Highscores (For flexing) */}
+          {currentStudent?.tier === "paid" && myHighscores.length > 0 && (
+            <PlayCard style={{ padding: "20px", borderRadius: "20px" }}>
+              <h4 style={{ margin: "0 0 16px 0", fontSize: "1.1rem", fontWeight: "900", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "8px" }}>
+                <span>🏆 My Highscores (Brag & Flex)</span>
+              </h4>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "12px" }}>
+                {myHighscores.map(hs => (
+                  <div
+                    key={hs.gameId}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      backgroundColor: "var(--bg-secondary)",
+                      border: "2px solid #cbd5e1",
+                      borderRadius: "14px",
+                      padding: "10px 14px"
+                    }}
+                  >
+                    <div style={{ textAlign: "left" }}>
+                      <strong style={{ fontSize: "0.9rem", color: "var(--text-primary)" }}>{hs.title}</strong>
+                      <div style={{ fontSize: "0.8rem", color: "var(--accent-primary)", fontWeight: "900", marginTop: "2px" }}>
+                        🎯 Max Score: {hs.maxCorrect} correct
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setActiveFlexGame({ gameId: hs.gameId, title: hs.title, score: hs.maxCorrect });
+                        setShowFlexModal(true);
+                      }}
+                      className="btn btn-success"
+                      style={{
+                        padding: "6px 12px",
+                        fontSize: "0.8rem",
+                        fontWeight: "800",
+                        borderRadius: "8px",
+                        border: "none",
+                        cursor: "pointer",
+                        boxShadow: "0 3px 0 #16a34a"
+                      }}
+                    >
+                      💪 Flex
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </PlayCard>
+          )}
+
+          {/* My Friends List */}
+          <PlayCard style={{ padding: "20px", borderRadius: "20px" }}>
+            <h4 style={{ margin: "0 0 16px 0", fontSize: "1.1rem", fontWeight: "900", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "8px" }}>
+              <span>👥 My Friends ({friendsList.length})</span>
+            </h4>
+            
+            {friendsList.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "30px 10px", color: "var(--text-secondary)", fontWeight: "600" }}>
+                <span style={{ fontSize: "2.5rem", display: "block", marginBottom: "8px" }}>🎈</span>
+                No friends added yet. Invite your classmates to check out their progress!
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                {friendsList.map(friend => {
+                  const isExpanded = expandedFriendId === friend.id;
+                  const logs = friendLogs[friend.id] || [];
+                  
+                  // Group logs by gameId to calculate high scores
+                  const playedGamesMap: Record<string, { title: string; maxCorrect: number; totalAttempts: number }> = {};
+                  logs.forEach(log => {
+                    if (!playedGamesMap[log.gameId]) {
+                      playedGamesMap[log.gameId] = {
+                        title: log.gameTitle,
+                        maxCorrect: log.correctAnswers,
+                        totalAttempts: 1
+                      };
+                    } else {
+                      playedGamesMap[log.gameId].maxCorrect = Math.max(playedGamesMap[log.gameId].maxCorrect, log.correctAnswers);
+                      playedGamesMap[log.gameId].totalAttempts += 1;
+                    }
+                  });
+                  const playedGames = Object.values(playedGamesMap);
+
+                  // Find the request ID to allow unfriending
+                  const relRequest = friendRequests.find(r => 
+                    r.status === "accepted" && 
+                    ((r.senderId === currentStudent?.id && r.receiverId === friend.id) || 
+                     (r.senderId === friend.id && r.receiverId === currentStudent?.id))
+                  );
+
+                  return (
+                    <div
+                      key={friend.id}
+                      style={{
+                        border: isExpanded ? "3px solid var(--accent-primary)" : "2px solid #cbd5e1",
+                        borderRadius: "18px",
+                        overflow: "hidden",
+                        backgroundColor: "var(--bg-secondary)",
+                        transition: "all 0.2s ease"
+                      }}
+                    >
+                      {/* Friend Info Header Row */}
+                      <div
+                        onClick={() => setExpandedFriendId(isExpanded ? null : friend.id)}
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          padding: "14px 18px",
+                          cursor: "pointer",
+                          userSelect: "none",
+                          backgroundColor: isExpanded ? "rgba(79, 70, 229, 0.05)" : "transparent"
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                          <AvatarIcon avatarId={friend.avatar} size="sm" />
+                          <div style={{ textAlign: "left" }}>
+                            <strong style={{ fontSize: "1.05rem", color: "var(--text-primary)" }}>{friend.name}</strong>
+                            <div style={{ display: "flex", gap: "8px", marginTop: "2px" }}>
+                              <span style={{ fontSize: "0.8rem", color: "#b45309", fontWeight: "700" }}>⭐ {friend.stars} Stars</span>
+                              <span style={{ fontSize: "0.8rem", color: "#16a34a", fontWeight: "700" }}>🔥 {friend.streak} Streak</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                          {currentStudent?.tier === "paid" && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveChallengeFriend(friend);
+                                setShowChallengeModal(true);
+                              }}
+                              className="btn btn-primary"
+                              style={{
+                                padding: "6px 12px",
+                                fontSize: "0.8rem",
+                                fontWeight: "800",
+                                borderRadius: "8px",
+                                border: "none",
+                                cursor: "pointer",
+                                boxShadow: "0 3px 0 var(--accent-secondary)",
+                                marginRight: "4px"
+                              }}
+                            >
+                              ⚔️ Challenge
+                            </button>
+                          )}
+                          <span style={{ fontSize: "1.2rem" }}>
+                            {isExpanded ? "🔼" : "🔽"}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Expanded Section (High Scores) */}
+                      {isExpanded && (
+                        <div
+                          style={{
+                            padding: "16px 18px",
+                            backgroundColor: "var(--bg-primary)",
+                            borderTop: "2px dashed #cbd5e1"
+                          }}
+                        >
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                            <span style={{ fontSize: "0.9rem", fontWeight: "800", color: "var(--text-secondary)" }}>
+                              🎮 Games & Highscores
+                            </span>
+                            
+                            {/* Unfriend Button */}
+                            {relRequest && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (confirm(`Are you sure you want to remove ${friend.name} from friends?`)) {
+                                    handleDeclineRequest(relRequest.id, friend.name, true);
+                                  }
+                                }}
+                                style={{
+                                  padding: "4px 10px",
+                                  fontSize: "0.75rem",
+                                  backgroundColor: "transparent",
+                                  border: "1.5px solid #fca5a5",
+                                  color: "#b91c1c",
+                                  borderRadius: "8px",
+                                  fontWeight: "800",
+                                  cursor: "pointer"
+                                }}
+                              >
+                                Unfriend ✖
+                              </button>
+                            )}
+                          </div>
+
+                          {currentStudent?.tier !== "paid" ? (
+                            /* Premium Locked Highscores for Free Users */
+                            <div
+                              style={{
+                                textAlign: "center",
+                                padding: "20px 10px",
+                                backgroundColor: "rgba(239, 68, 68, 0.05)",
+                                border: "2px dashed #fca5a5",
+                                borderRadius: "14px",
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "center",
+                                gap: "8px"
+                              }}
+                            >
+                              <span style={{ fontSize: "2rem" }}>🔒</span>
+                              <strong style={{ fontSize: "0.9rem", color: "#b91c1c" }}>High Scores Locked</strong>
+                              <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--text-secondary)", fontWeight: "600", lineHeight: "1.4" }}>
+                                Viewing friend high scores is a premium feature.<br />
+                                Upgrade your account to unlock this feature!
+                              </p>
+                              <button
+                                onClick={handleUpgradeToPremium}
+                                className="btn btn-success"
+                                style={{ padding: "6px 12px", fontSize: "0.8rem", borderRadius: "8px", marginTop: "4px" }}
+                              >
+                                💎 Simulate Upgrade
+                              </button>
+                            </div>
+                          ) : (
+                            /* Scores List for Premium Users */
+                            <div>
+                              {playedGames.length === 0 ? (
+                                <div style={{ color: "var(--text-secondary)", fontSize: "0.85rem", fontStyle: "italic", textAlign: "center", padding: "10px 0" }}>
+                                  This friend hasn't played any games yet. 🎮
+                                </div>
+                              ) : (
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "8px" }}>
+                                  {playedGames.map(game => (
+                                    <div
+                                      key={game.title}
+                                      style={{
+                                        display: "flex",
+                                        justifyContent: "space-between",
+                                        alignItems: "center",
+                                        backgroundColor: "var(--bg-secondary)",
+                                        padding: "10px 14px",
+                                        borderRadius: "10px",
+                                        border: "1.5px solid #e2e8f0"
+                                      }}
+                                    >
+                                      <span style={{ fontSize: "0.9rem", fontWeight: "800", color: "var(--text-primary)" }}>
+                                        {game.title}
+                                      </span>
+                                      <div style={{ display: "flex", gap: "10px" }}>
+                                        <span style={{ fontSize: "0.85rem", color: "var(--accent-primary)", fontWeight: "900", backgroundColor: "rgba(79, 70, 229, 0.08)", padding: "3px 8px", borderRadius: "6px" }}>
+                                          🎯 Max Score: {game.maxCorrect} correct
+                                        </span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </PlayCard>
+        </div>
+      )}
 
       {/* Exit Dashboard using kids-friendly exit door */}
       <div style={{ display: "flex", justifyContent: "center", marginTop: "28px", marginBottom: "10px" }}>
@@ -1135,6 +2210,148 @@ export const Dashboard: React.FC = () => {
               }}
             >
               {lockedReason === "stars" ? "Okay! 🎮" : "Go Back"}
+            </button>
+          </PlayCard>
+        </div>
+      )}
+
+      {/* 4. Flex selector Modal */}
+      {showFlexModal && activeFlexGame && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(15, 23, 42, 0.4)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 10000,
+            padding: "20px",
+            backdropFilter: "blur(5px)"
+          }}
+        >
+          <PlayCard
+            style={{
+              maxWidth: "360px",
+              width: "100%",
+              padding: "24px",
+              backgroundColor: "var(--bg-secondary)",
+              border: "4px solid var(--accent-primary)",
+              borderRadius: "24px",
+              textAlign: "center"
+            }}
+          >
+            <h3 style={{ margin: "0 0 10px 0", fontSize: "1.3rem", fontWeight: "900" }}>
+              💪 Flex Your Score!
+            </h3>
+            <p style={{ color: "var(--text-secondary)", fontSize: "0.95rem", fontWeight: "600", margin: "0 0 20px 0" }}>
+              Flex your score of <strong>{activeFlexGame.score}</strong> in <strong>{activeFlexGame.title}</strong> on a friend:
+            </p>
+
+            {friendsList.length === 0 ? (
+              <p style={{ fontStyle: "italic", fontSize: "0.9rem", color: "var(--text-secondary)", marginBottom: "20px" }}>
+                Add some friends first to flex your scores!
+              </p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "200px", overflowY: "auto", marginBottom: "20px" }}>
+                {friendsList.map(friend => (
+                  <button
+                    key={friend.id}
+                    onClick={() => handleFlexScore(friend.id, friend.name)}
+                    className="btn btn-gray"
+                    style={{
+                      padding: "10px",
+                      fontSize: "0.95rem",
+                      fontWeight: "800",
+                      width: "100%",
+                      textAlign: "left",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px"
+                    }}
+                  >
+                    <AvatarIcon avatarId={friend.avatar} size="sm" />
+                    <span>Flex with {friend.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <button
+              onClick={() => setShowFlexModal(false)}
+              className="btn btn-gray"
+              style={{ width: "100%", padding: "12px", fontWeight: "800" }}
+            >
+              Close
+            </button>
+          </PlayCard>
+        </div>
+      )}
+
+      {/* 5. Challenge Game selector Modal */}
+      {showChallengeModal && activeChallengeFriend && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(15, 23, 42, 0.4)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 10000,
+            padding: "20px",
+            backdropFilter: "blur(5px)"
+          }}
+        >
+          <PlayCard
+            style={{
+              maxWidth: "360px",
+              width: "100%",
+              padding: "24px",
+              backgroundColor: "var(--bg-secondary)",
+              border: "4px solid var(--accent-primary)",
+              borderRadius: "24px",
+              textAlign: "center"
+            }}
+          >
+            <h3 style={{ margin: "0 0 10px 0", fontSize: "1.3rem", fontWeight: "900" }}>
+              ⚔️ Challenge {activeChallengeFriend.name}!
+            </h3>
+            <p style={{ color: "var(--text-secondary)", fontSize: "0.95rem", fontWeight: "600", margin: "0 0 20px 0" }}>
+              Select a game to challenge them:
+            </p>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "250px", overflowY: "auto", marginBottom: "20px" }}>
+              {games.map(game => (
+                <button
+                  key={game.id}
+                  onClick={() => handleSendChallenge(game.id, game.title)}
+                  className="btn btn-gray"
+                  style={{
+                    padding: "10px",
+                    fontSize: "0.95rem",
+                    fontWeight: "800",
+                    width: "100%",
+                    textAlign: "left"
+                  }}
+                >
+                  {game.title}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setShowChallengeModal(false)}
+              className="btn btn-gray"
+              style={{ width: "100%", padding: "12px", fontWeight: "800" }}
+            >
+              Cancel
             </button>
           </PlayCard>
         </div>

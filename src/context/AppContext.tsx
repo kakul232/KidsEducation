@@ -38,6 +38,7 @@ interface AppContextType {
   notiPermission: NotificationPermission;
   requestNotiPermission: () => Promise<void>;
   sendPushNotification: (title: string, message: string) => Promise<void>;
+  updateStudent: (student: Student) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -453,6 +454,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     captureAndSave();
   };
 
+  const updateStudent = async (updated: Student) => {
+    await LocalDB.saveStudent(updated);
+    setCurrentStudent(updated);
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -477,7 +483,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isAuthLoading,
         notiPermission,
         requestNotiPermission,
-        sendPushNotification
+        sendPushNotification,
+        updateStudent
       }}
     >
       {children}

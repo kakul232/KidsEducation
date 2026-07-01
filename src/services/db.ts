@@ -1,5 +1,5 @@
 import { db } from "./firebase";
-import { collection, doc, getDoc, getDocs, setDoc, deleteDoc } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, setDoc, deleteDoc, query, where } from "firebase/firestore";
 
 export interface Student {
   id: string;
@@ -56,6 +56,32 @@ export interface GameRequest {
   studentId: string;
   studentName: string;
   idea: string;
+  createdAt: string;
+}
+
+export interface FriendRequest {
+  id: string;
+  senderId: string;
+  senderName: string;
+  senderPhone?: string;
+  receiverId: string;
+  receiverName: string;
+  receiverPhone?: string;
+  status: "pending" | "accepted";
+  createdAt: string;
+}
+export interface Challenge {
+  id: string;
+  type: "challenge" | "flex";
+  senderId: string;
+  senderName: string;
+  receiverId: string;
+  receiverName: string;
+  gameId: string;
+  gameTitle: string;
+  senderScore: number;
+  receiverScore?: number;
+  status: "pending" | "completed" | "seen";
   createdAt: string;
 }
 
@@ -738,6 +764,150 @@ export const LocalDB = {
       await deleteDoc(doc(db, "game_requests", id));
     } catch (e) {
       console.error("Firestore deleteGameRequest failed", e);
+      throw e;
+    }
+  },
+
+  // Friend Requests CRUD
+  async getStudentByPhone(phone: string): Promise<Student | undefined> {
+    try {
+      const q = query(collection(db, "students"), where("phone", "==", phone));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        return snap.docs[0].data() as Student;
+      }
+      return undefined;
+    } catch (e) {
+      console.error("Firestore getStudentByPhone failed", e);
+      return undefined;
+    }
+  },
+
+  async sendFriendRequest(sender: Student, receiver: Student): Promise<void> {
+    try {
+      const id = "freq_" + Math.random().toString(36).substr(2, 9);
+      const req: FriendRequest = {
+        id,
+        senderId: sender.id,
+        senderName: sender.name,
+        senderPhone: sender.phone || "",
+        receiverId: receiver.id,
+        receiverName: receiver.name,
+        receiverPhone: receiver.phone || "",
+        status: "pending",
+        createdAt: new Date().toISOString()
+      };
+      await setDoc(doc(db, "friend_requests", id), req);
+    } catch (e) {
+      console.error("Firestore sendFriendRequest failed", e);
+      throw e;
+    }
+  },
+
+  async getFriendRequests(studentId: string): Promise<FriendRequest[]> {
+    try {
+      const qSender = query(collection(db, "friend_requests"), where("senderId", "==", studentId));
+      const qReceiver = query(collection(db, "friend_requests"), where("receiverId", "==", studentId));
+      const [snapSender, snapReceiver] = await Promise.all([
+        getDocs(qSender),
+        getDocs(qReceiver)
+      ]);
+      const list: FriendRequest[] = [];
+      snapSender.forEach(doc => list.push(doc.data() as FriendRequest));
+      snapReceiver.forEach(doc => list.push(doc.data() as FriendRequest));
+      return list;
+    } catch (e) {
+      console.error("Firestore getFriendRequests failed", e);
+      return [];
+    }
+  },
+
+  async acceptFriendRequest(requestId: string): Promise<void> {
+    try {
+      const docRef = doc(db, "friend_requests", requestId);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        const data = snap.data() as FriendRequest;
+        await setDoc(docRef, { ...data, status: "accepted" });
+      }
+    } catch (e) {
+      console.error("Firestore acceptFriendRequest failed", e);
+      throw e;
+    }
+  },
+
+  async deleteFriendRequest(requestId: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, "friend_requests", requestId));
+    } catch (e) {
+      console.error("Firestore deleteFriendRequest failed", e);
+      throw e;
+    }
+  },
+
+  async getStudentLogs(studentId: string): Promise<ActivityLog[]> {
+    try {
+      const q = query(collection(db, "analytics"), where("studentId", "==", studentId));
+      const snap = await getDocs(q);
+      return snap.docs.map(doc => doc.data() as ActivityLog);
+    } catch (e) {
+      console.error("Firestore getStudentLogs failed", e);
+      const cached = this.getCachedLogs();
+      return cached.filter(log => log.studentId === studentId);
+    }
+  },
+
+  // Challenges CRUD
+  async sendChallenge(challenge: Challenge): Promise<void> {
+    try {
+      await setDoc(doc(db, "challenges", challenge.id), challenge);
+    } catch (e) {
+      console.error("Firestore sendChallenge failed", e);
+      throw e;
+    }
+  },
+
+  async getChallenges(studentId: string): Promise<Challenge[]> {
+    try {
+      const qSender = query(collection(db, "challenges"), where("senderId", "==", studentId));
+      const qReceiver = query(collection(db, "challenges"), where("receiverId", "==", studentId));
+      const [snapSender, snapReceiver] = await Promise.all([
+        getDocs(qSender),
+        getDocs(qReceiver)
+      ]);
+      const list: Challenge[] = [];
+      snapSender.forEach(doc => list.push(doc.data() as Challenge));
+      snapReceiver.forEach(doc => list.push(doc.data() as Challenge));
+      return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } catch (e) {
+      console.error("Firestore getChallenges failed", e);
+      return [];
+    }
+  },
+
+  async completeChallenge(challengeId: string, receiverScore: number): Promise<void> {
+    try {
+      const docRef = doc(db, "challenges", challengeId);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        const data = snap.data() as Challenge;
+        await setDoc(docRef, {
+          ...data,
+          receiverScore,
+          status: "completed"
+        });
+      }
+    } catch (e) {
+      console.error("Firestore completeChallenge failed", e);
+      throw e;
+    }
+  },
+
+  async deleteChallenge(challengeId: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, "challenges", challengeId));
+    } catch (e) {
+      console.error("Firestore deleteChallenge failed", e);
       throw e;
     }
   }

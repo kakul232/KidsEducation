@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useApp } from "../../context/AppContext";
+import LocalDB from "../../services/db";
 import Sandbox from "../../components/Sandbox";
 import { ArrowLeft, Star, Volume2, Sparkles, Smile } from "lucide-react";
 import confetti from "canvas-confetti";
@@ -191,6 +192,28 @@ export const GamePlayer: React.FC = () => {
       rewardEarned: `⭐ ${reward} Stars`,
       attemptsHistory: finalAttemptsHistory
     });
+
+    // Challenge Completion Logic
+    const activeChallengeId = localStorage.getItem("active_challenge_id");
+    const challengeSenderScore = localStorage.getItem("active_challenge_sender_score");
+    const challengeSenderName = localStorage.getItem("active_challenge_sender_name");
+    
+    if (activeChallengeId) {
+      localStorage.removeItem("active_challenge_id");
+      localStorage.removeItem("active_challenge_sender_score");
+      localStorage.removeItem("active_challenge_sender_name");
+      
+      LocalDB.completeChallenge(activeChallengeId, correctCount);
+      
+      const targetScore = challengeSenderScore ? parseInt(challengeSenderScore, 10) : 0;
+      if (correctCount >= targetScore) {
+        speakText(`Woohoo! You beat ${challengeSenderName || "your friend"}'s challenge score of ${targetScore}! You got ${correctCount} correct answers! 🎉`);
+        alert(`🏆 Challenge Completed!\nYou beat ${challengeSenderName}'s score of ${targetScore} with a score of ${correctCount}! 🎉`);
+      } else {
+        speakText(`Nice try! You scored ${correctCount}, but ${challengeSenderName || "your friend"}'s score was ${targetScore}. You can try again! 😊`);
+        alert(`🧸 Nice Try!\nYou scored ${correctCount}. ${challengeSenderName}'s score is ${targetScore}. Keep practicing to beat it!`);
+      }
+    }
 
     // Run celebration
     playWinSound();
