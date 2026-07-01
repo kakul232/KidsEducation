@@ -2,13 +2,16 @@ import React, { useState, useEffect } from "react";
 import { useApp } from "../../context/AppContext";
 import LocalDB from "../../services/db";
 import type { Game, ActivityLog, FriendRequest, Student, Challenge } from "../../services/db";
-import { Trophy, Play, Lock, Send, RotateCcw } from "lucide-react";
-import { SUBJECTS } from "../../utils/constants";
+import { Send } from "lucide-react";
 import { AvatarIcon } from "../../components/AvatarIcon";
-import { StarBadge } from "../../components/StarBadge";
-import { StreakBadge } from "../../components/StreakBadge";
 import { PlayCard } from "../../components/PlayCard";
+import { KidsModal } from "../../components/KidsModal";
 import KidsLoader from "../../components/KidsLoader";
+import { StudentHeader } from "../../components/student/StudentHeader";
+import { PWABanners } from "../../components/student/PWABanners";
+import { SubjectSelector } from "../../components/student/SubjectSelector";
+import { GameList } from "../../components/student/GameList";
+import { FriendsHub } from "../../components/student/FriendsHub";
 
 const DIFFICULTY_SYMBOLS: Record<string, { symbol: string; label: string; color: string; bg: string }> = {
   Easy: { symbol: "🌱", label: "Seedling", color: "#15803d", bg: "#d1fae5" },
@@ -507,6 +510,8 @@ export const Dashboard: React.FC = () => {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+
+
   const handleStudentLogOut = () => {
     localStorage.removeItem("active_student_id");
     // Reload page or update view to reset state
@@ -624,57 +629,8 @@ export const Dashboard: React.FC = () => {
 
   return (
     <div className="container animate-slide-up">
-      {/* Student Profile Header using Reusable PlayCard, AvatarIcon, StarBadge and StreakBadge */}
-      <PlayCard
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          flexWrap: "wrap",
-          gap: "12px",
-          padding: "16px 20px",
-          marginBottom: "20px",
-          backgroundColor: "var(--bg-secondary)",
-          borderBottom: "6px solid var(--accent-secondary)",
-          borderTop: 0,
-          borderLeft: 0,
-          borderRight: 0,
-          borderRadius: "var(--border-radius)"
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          {currentStudent && <AvatarIcon avatarId={currentStudent.avatar} size="md" />}
-          <div>
-            <h2 style={{ fontSize: "1.2rem", margin: 0 }}>
-              Hi, {currentStudent?.name || "Student"}!
-            </h2>
-            <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "2px" }}>
-              <span style={{ fontSize: "0.8rem", color: "var(--text-secondary)", fontWeight: "600" }}>Student Account</span>
-              <span
-                style={{
-                  fontSize: "0.75rem",
-                  backgroundColor: isPremium(currentStudent) ? "#e0f2fe" : "#f1f5f9",
-                  color: isPremium(currentStudent) ? "#0369a1" : "#475569",
-                  padding: "2px 8px",
-                  borderRadius: "8px",
-                  fontWeight: "900",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "2px",
-                  border: isPremium(currentStudent) ? "1.5px solid #bae6fd" : "1.5px solid #cbd5e1"
-                }}
-              >
-                {isPremium(currentStudent) ? "💎 Premium" : "🆓 Free"}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-          <StarBadge count={currentStudent?.stars || 0} />
-          <StreakBadge days={currentStudent?.streak || 1} />
-        </div>
-      </PlayCard>
+      {/* Student Profile Header */}
+      <StudentHeader currentStudent={currentStudent} isPremium={isPremium} />
 
       {/* Segmented Tab Controller for Games vs Friends */}
       <div
@@ -749,1218 +705,107 @@ export const Dashboard: React.FC = () => {
 
       {activeTab === "games" && (
         <>
-          {/* Custom Add to Homescreen install prompt for PWA support */}
-          {installPrompt && (
-        <PlayCard
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexWrap: "wrap",
-            gap: "12px",
-            padding: "12px 18px",
-            backgroundColor: "#e0f2fe",
-            borderColor: "#38bdf8",
-            borderWidth: "2.5px",
-            borderStyle: "solid",
-            marginBottom: "20px",
-            borderRadius: "16px",
-            boxShadow: "0 4px 0 #0284c7"
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <span style={{ fontSize: "1.8rem" }}>📱</span>
-            <div style={{ textAlign: "left" }}>
-              <strong style={{ display: "block", fontSize: "0.95rem", color: "#0369a1" }}>Install app on your phone!</strong>
-              <span style={{ fontSize: "0.8rem", color: "#0284c7" }}>Play games faster from your homescreen!</span>
-            </div>
-          </div>
-          <button
-            onClick={triggerInstall}
-            className="btn"
-            style={{
-              padding: "8px 14px",
-              backgroundColor: "var(--accent-secondary)",
-              color: "#ffffff",
-              fontSize: "0.85rem",
-              borderRadius: "10px",
-              fontWeight: "800",
-              boxShadow: "0 3px 0 #0284c7",
-              border: "none",
-              cursor: "pointer"
-            }}
-          >
-            📥 Install
-          </button>
-        </PlayCard>
-      )}
+          <PWABanners
+            installPrompt={installPrompt}
+            triggerInstall={triggerInstall}
+            notiPermission={notiPermission}
+            requestNotiPermission={requestNotiPermission}
+          />
 
-      {/* Custom PWA Push Notification permission prompt banner */}
-      {notiPermission === "default" && (
-        <PlayCard
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexWrap: "wrap",
-            gap: "12px",
-            padding: "12px 18px",
-            backgroundColor: "#fef2f2",
-            borderColor: "#fca5a5",
-            borderWidth: "2.5px",
-            borderStyle: "solid",
-            marginBottom: "20px",
-            borderRadius: "16px",
-            boxShadow: "0 4px 0 #ef4444"
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <span style={{ fontSize: "1.8rem" }}>🔔</span>
-            <div style={{ textAlign: "left" }}>
-              <strong style={{ display: "block", fontSize: "0.95rem", color: "#991b1b" }}>Turn on Game Alerts!</strong>
-              <span style={{ fontSize: "0.85rem", color: "#b91c1c" }}>Get notified when new games are ready to play! ✨</span>
-            </div>
-          </div>
-          <button
-            onClick={requestNotiPermission}
-            className="btn"
-            style={{
-              padding: "8px 14px",
-              backgroundColor: "var(--accent-primary)",
-              color: "#ffffff",
-              fontSize: "0.85rem",
-              borderRadius: "10px",
-              fontWeight: "800",
-              boxShadow: "0 3px 0 #b91c1c",
-              border: "none",
-              cursor: "pointer"
-            }}
-          >
-            Alert Me!
-          </button>
-        </PlayCard>
-      )}
+          <SubjectSelector
+            selectedSubject={selectedSubject}
+            setSelectedSubject={setSelectedSubject}
+          />
 
-      {/* Subject Selector using Reusable PlayCard */}
-      <div style={{ display: "grid", gridTemplateColumns: `repeat(${SUBJECTS.filter(s => s.enabled).length}, 1fr)`, gap: "12px", marginBottom: "24px" }}>
-        {SUBJECTS.filter(s => s.enabled).map(subject => (
-          <PlayCard
-            key={subject.id}
-            onClick={() => setSelectedSubject(subject.id)}
-            style={{
-              backgroundColor: subject.color,
-              borderColor: selectedSubject === subject.id ? "var(--text-primary)" : subject.border,
-              borderWidth: "3px",
-              borderStyle: selectedSubject === subject.id ? "solid" : "dashed",
-              cursor: "pointer",
-              padding: "16px",
-              textAlign: "center",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: "6px"
-            }}
-          >
-            <span style={{ fontSize: "1.1rem", fontWeight: "800", color: "#1e293b" }}>
-              {subject.title}
-            </span>
-          </PlayCard>
-        ))}
-      </div>
-
-      {/* Games List for Subject with list/grid toggle */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-        <h3 style={{ fontSize: "1.3rem", color: "var(--text-primary)", margin: 0 }}>
-          Choose a Game:
-        </h3>
-        <div style={{ display: "flex", gap: "6px" }}>
-          <button
-            onClick={() => setViewMode("list")}
-            style={{
-              padding: "6px 12px",
-              fontSize: "0.8rem",
-              borderRadius: "10px",
-              border: "2px solid #cbd5e1",
-              backgroundColor: viewMode === "list" ? "var(--accent-primary)" : "var(--bg-secondary)",
-              color: viewMode === "list" ? "#ffffff" : "var(--text-primary)",
-              fontWeight: "800",
-              cursor: "pointer"
-            }}
-          >
-            📋 List
-          </button>
-          <button
-            onClick={() => setViewMode("grid")}
-            style={{
-              padding: "6px 12px",
-              fontSize: "0.8rem",
-              borderRadius: "10px",
-              border: "2px solid #cbd5e1",
-              backgroundColor: viewMode === "grid" ? "var(--accent-primary)" : "var(--bg-secondary)",
-              color: viewMode === "grid" ? "#ffffff" : "var(--text-primary)",
-              fontWeight: "800",
-              cursor: "pointer"
-            }}
-          >
-            🎛️ Grid
-          </button>
-        </div>
-      </div>
-
-      <div style={{ flex: 1 }}>
-        {games.length === 0 ? (
-          <PlayCard style={{ textAlign: "center", padding: "40px 20px", border: "2px dashed #cbd5e1" }}>
-            <Trophy size={48} color="#94a3b8" style={{ marginBottom: "12px" }} />
-            <p style={{ color: "var(--text-secondary)", fontWeight: "600" }}>
-              No games published yet. Wait for your teacher to create some! 😊
-            </p>
-          </PlayCard>
-        ) : (
-          <div
-            style={
-              viewMode === "list"
-                ? { display: "flex", flexDirection: "column", gap: "16px" }
-                : { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "16px" }
-            }
-          >
-            {games.slice(0, visibleGameCount).map(game => {
-              const { emoji, cleanTitle } = parseGameTitle(game.title);
-              const isPremiumLocked = game.isFree === false && !isPremium(currentStudent);
-              const isStarLocked = game.starsRequired ? (currentStudent?.stars || 0) < game.starsRequired : false;
-              const isGameLocked = isPremiumLocked || isStarLocked;
-              return (
-                <PlayCard
-                  key={game.id}
-                  onClick={() => {
-                    if (isGameLocked) {
-                      if (isStarLocked) {
-                        speakText(`Ooh! You need ${game.starsRequired} Stars to play ${cleanTitle}! You currently have ${currentStudent?.stars || 0} stars. Keep playing to earn more!`);
-                        setLockedGameTitle(cleanTitle);
-                        setLockedReason("stars");
-                        setLockedStarsRequired(game.starsRequired || 0);
-                        setShowLockModal(true);
-                      } else {
-                        speakText(`Ooh! ${cleanTitle} is a premium game! Ask your teacher or parent to unlock it.`);
-                        setLockedGameTitle(cleanTitle);
-                        setLockedReason("premium");
-                        setShowLockModal(true);
-                      }
-                    } else {
-                      setPlayingGame(game);
-                    }
-                  }}
-                  style={{
-                    display: "flex",
-                    flexDirection: viewMode === "list" ? "row" : "column",
-                    alignItems: viewMode === "list" ? "center" : "stretch",
-                    backgroundColor: completedGames[game.id] ? "#f0fdf4" : "var(--bg-secondary)",
-                    borderColor: completedGames[game.id] ? "#86efac" : "#e2e8f0",
-                    borderWidth: "3px",
-                    borderStyle: "solid",
-                    boxShadow: "0 6px 0 rgba(0,0,0,0.05)",
-                    padding: viewMode === "list" ? "16px 20px" : "20px 16px",
-                    gap: "16px",
-                    cursor: "pointer",
-                    position: "relative"
-                  }}
-                >
-                  {/* Premium / Star Lock Overlay Badge */}
-                  {isGameLocked && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        top: "10px",
-                        right: "10px",
-                        backgroundColor: "#ef4444",
-                        color: "white",
-                        borderRadius: isStarLocked ? "12px" : "50%",
-                        padding: isStarLocked ? "4px 8px" : "0",
-                        height: isStarLocked ? "auto" : "30px",
-                        minWidth: isStarLocked ? "auto" : "30px",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        boxShadow: "0 4px 8px rgba(239, 68, 68, 0.4)",
-                        border: "2.5px solid white",
-                        fontSize: isStarLocked ? "0.7rem" : "inherit",
-                        fontWeight: "900",
-                        zIndex: 5
-                      }}
-                      title={isStarLocked ? `Requires ${game.starsRequired} Stars` : "Premium Game"}
-                    >
-                      {isStarLocked ? (
-                        <span style={{ display: "flex", alignItems: "center", gap: "3px", whiteSpace: "nowrap" }}>
-                          🔒 {game.starsRequired} ⭐
-                        </span>
-                      ) : (
-                        <Lock size={12} fill="white" />
-                      )}
-                    </div>
-                  )}
-
-                  {/* Big Game Logo */}
-                  <div
-                    style={{
-                      fontSize: viewMode === "list" ? "2.2rem" : "2.8rem",
-                      width: viewMode === "list" ? "60px" : "80px",
-                      height: viewMode === "list" ? "60px" : "80px",
-                      minWidth: viewMode === "list" ? "60px" : "80px",
-                      borderRadius: viewMode === "list" ? "16px" : "22px",
-                      backgroundColor: completedGames[game.id] ? "#d1fae5" : "var(--bg-primary)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      boxShadow: "inset 0 -4px 0 rgba(0,0,0,0.05)",
-                      margin: viewMode === "list" ? "0" : "0 auto 8px auto",
-                      alignSelf: "center"
-                    }}
-                  >
-                    {emoji}
-                  </div>
-
-                  <div style={{ display: "flex", flexDirection: "column", gap: "8px", flex: 1, textAlign: viewMode === "list" ? "left" : "center" }}>
-                    <span
-                      style={{
-                        fontSize: viewMode === "list" ? "1.2rem" : "1.05rem",
-                        fontWeight: "800",
-                        display: "flex",
-                        flexDirection: viewMode === "list" ? "row" : "column",
-                        alignItems: "center",
-                        justifyContent: viewMode === "list" ? "flex-start" : "center",
-                        flexWrap: "wrap",
-                        color: "var(--text-primary)",
-                        wordSpacing: "0.1em",
-                        lineHeight: "1.2"
-                      }}
-                    >
-                      <span>{cleanTitle}</span>
-
-                      {/* Preview Upcoming Game tag if game is not published */}
-                      {!game.published && (
-                        <span
-                          style={{
-                            fontSize: "0.75rem",
-                            backgroundColor: "#f59e0b",
-                            color: "#ffffff",
-                            padding: "2px 8px",
-                            borderRadius: "8px",
-                            fontWeight: "900",
-                            letterSpacing: "0.05em",
-                            marginLeft: viewMode === "list" ? "10px" : "0",
-                            marginTop: viewMode === "list" ? "0" : "6px",
-                            lineHeight: "1"
-                          }}
-                        >
-                          Preview Upcoming Game
-                        </span>
-                      )}
-
-                      {/* Animated NEW Tag for newly published games, hiding if completed */}
-                      {isNew(game.createdAt) && !completedGames[game.id] && (
-                        <span
-                          className="animate-tag-pulse"
-                          style={{
-                            fontSize: "0.75rem",
-                            backgroundColor: "#f43f5e",
-                            color: "#ffffff",
-                            padding: "2px 8px",
-                            borderRadius: "8px",
-                            fontWeight: "900",
-                            letterSpacing: "0.05em",
-                            marginLeft: viewMode === "list" ? "10px" : "0",
-                            marginTop: viewMode === "list" ? "0" : "6px",
-                            lineHeight: "1"
-                          }}
-                        >
-                          NEW
-                        </span>
-                      )}
-                    </span>
-                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", justifyContent: viewMode === "list" ? "flex-start" : "center" }}>
-                      {(() => {
-                        const diff = DIFFICULTY_SYMBOLS[game.difficulty] || DIFFICULTY_SYMBOLS.Easy;
-                        return (
-                          <span
-                            style={{
-                              fontSize: "0.8rem",
-                              backgroundColor: diff.bg,
-                              color: diff.color,
-                              padding: "4px 10px",
-                              borderRadius: "10px",
-                              fontWeight: "800",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: "4px"
-                            }}
-                          >
-                            <span>{diff.symbol}</span>
-                            <span>{diff.label}</span>
-                          </span>
-                        );
-                      })()}
-
-                      {/* Completed star rewards indicator */}
-                      {completedGames[game.id] && (
-                        <span
-                          style={{
-                            fontSize: "0.75rem",
-                            backgroundColor: "#d1fae5",
-                            color: "#065f46",
-                            padding: "4px 8px",
-                            borderRadius: "10px",
-                            fontWeight: "800",
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "4px",
-                            whiteSpace: "nowrap"
-                          }}
-                          title="Replay this activity to earn even more stars!"
-                        >
-                          ✓ Done ({completedGames[game.id]})
-                        </span>
-                      )}
-
-                      {/* Premium Game badge indicator */}
-                      {game.isFree === false && (
-                        <span
-                          style={{
-                            fontSize: "0.8rem",
-                            backgroundColor: "#fee2e2",
-                            color: "#b91c1c",
-                            padding: "4px 10px",
-                            borderRadius: "10px",
-                            fontWeight: "800",
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "4px"
-                          }}
-                        >
-                          💎 Premium
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: viewMode === "list" ? "flex-end" : "center",
-                      alignItems: "center",
-                      marginTop: viewMode === "list" ? 0 : "8px"
-                    }}
-                  >
-                    <div
-                      style={{
-                        backgroundColor: isGameLocked ? "#cbd5e1" : completedGames[game.id] ? "#10b981" : "var(--accent-primary)",
-                        color: "#fff",
-                        borderRadius: "50%",
-                        width: "48px",
-                        height: "48px",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        boxShadow: isGameLocked ? "none" : completedGames[game.id] ? "0 6px 12px rgba(16, 185, 129, 0.3)" : "0 6px 12px rgba(79, 70, 229, 0.3)"
-                      }}
-                    >
-                      {isGameLocked ? (
-                        <Lock size={20} fill="#fff" />
-                      ) : completedGames[game.id] ? (
-                        <RotateCcw size={20} />
-                      ) : (
-                        <Play size={20} fill="#fff" />
-                      )}
-                    </div>
-                  </div>
-                </PlayCard>
-              );
-            })}
-
-            {/* Special "Ask for More / Idea Lightbulb" Tile Card */}
-            <PlayCard
-              onClick={() => {
-                speakText("Do you want to share a game idea with your teacher? Tap here!");
-                setShowRequestModal(true);
-              }}
-              style={{
-                display: "flex",
-                flexDirection: viewMode === "list" ? "row" : "column",
-                alignItems: "center",
-                justifyContent: "center",
-                backgroundColor: "var(--bg-secondary)",
-                borderColor: "var(--accent-primary)",
-                borderWidth: "3px",
-                borderStyle: "dashed",
-                boxShadow: "0 6px 0 rgba(0,0,0,0.05)",
-                padding: "20px 16px",
-                gap: "16px",
-                cursor: "pointer",
-                textAlign: "center",
-                minHeight: viewMode === "list" ? "auto" : "180px"
-              }}
-            >
-              <div
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+            <h3 style={{ fontSize: "1.3rem", color: "var(--text-primary)", margin: 0 }}>
+              Choose a Game:
+            </h3>
+            <div style={{ display: "flex", gap: "6px" }}>
+              <button
+                onClick={() => setViewMode("list")}
                 style={{
-                  fontSize: viewMode === "list" ? "2.2rem" : "2.8rem",
-                  color: "var(--accent-primary)",
-                  animation: "kids-wiggle 2.5s infinite ease-in-out",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  width: viewMode === "list" ? "60px" : "80px",
-                  height: viewMode === "list" ? "60px" : "80px",
-                  borderRadius: "50%",
-                  backgroundColor: "rgba(79, 70, 229, 0.1)"
+                  padding: "6px 12px",
+                  fontSize: "0.8rem",
+                  borderRadius: "10px",
+                  border: "2px solid #cbd5e1",
+                  backgroundColor: viewMode === "list" ? "var(--accent-primary)" : "var(--bg-secondary)",
+                  color: viewMode === "list" ? "#ffffff" : "var(--text-primary)",
+                  fontWeight: "800",
+                  cursor: "pointer"
                 }}
               >
-                💡
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "4px", flex: 1 }}>
-                <span style={{ fontWeight: "900", fontSize: "1.1rem", color: "var(--text-primary)" }}>
-                  Ask for More!
-                </span>
-                <span style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>
-                  Share your fun game idea with your teacher!
-                </span>
-              </div>
-            </PlayCard>
+                📋 List
+              </button>
+              <button
+                onClick={() => setViewMode("grid")}
+                style={{
+                  padding: "6px 12px",
+                  fontSize: "0.8rem",
+                  borderRadius: "10px",
+                  border: "2px solid #cbd5e1",
+                  backgroundColor: viewMode === "grid" ? "var(--accent-primary)" : "var(--bg-secondary)",
+                  color: viewMode === "grid" ? "#ffffff" : "var(--text-primary)",
+                  fontWeight: "800",
+                  cursor: "pointer"
+                }}
+              >
+                🎛️ Grid
+              </button>
+            </div>
           </div>
-        )}
-      </div>
-      </>
+
+          <GameList
+            games={games}
+            viewMode={viewMode}
+            completedGames={completedGames}
+            currentStudent={currentStudent}
+            isPremium={isPremium}
+            isNew={isNew}
+            parseGameTitle={parseGameTitle}
+            DIFFICULTY_SYMBOLS={DIFFICULTY_SYMBOLS}
+            onPlayGame={setPlayingGame}
+            onShowLockModal={(title, reason, starsReq) => {
+              setLockedGameTitle(title);
+              setLockedReason(reason);
+              setLockedStarsRequired(starsReq);
+              setShowLockModal(true);
+            }}
+            speakText={speakText}
+            visibleGameCount={visibleGameCount}
+            showRequestModalToggle={() => setShowRequestModal(true)}
+          />
+        </>
       )}
 
       {/* Friends Hub Panel */}
       {activeTab === "friends" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-          
-          {/* Social Alert Banner (Error/Success messages) */}
-          {(socialError || socialSuccess) && (
-            <PlayCard
-              style={{
-                padding: "12px 18px",
-                backgroundColor: socialError ? "#fef2f2" : "#f0fdf4",
-                borderColor: socialError ? "#fca5a5" : "#86efac",
-                borderWidth: "2.5px",
-                borderStyle: "solid",
-                borderRadius: "16px",
-                boxShadow: `0 4px 0 ${socialError ? "#ef4444" : "#10b981"}`
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <span style={{ fontSize: "1.5rem" }}>{socialError ? "⚠️" : "🎉"}</span>
-                <span
-                  style={{
-                    fontSize: "0.95rem",
-                    fontWeight: "700",
-                    color: socialError ? "#b91c1c" : "#15803d"
-                  }}
-                >
-                  {socialError || socialSuccess}
-                </span>
-              </div>
-            </PlayCard>
-          )}
-
-          {/* Premium Tier Status Card */}
-          <PlayCard
-            style={{
-              padding: "20px",
-              backgroundColor: "var(--bg-secondary)",
-              borderColor: isPremium(currentStudent) ? "#cbd5e1" : "#fca5a5",
-              borderWidth: "3px",
-              borderStyle: isPremium(currentStudent) ? "solid" : "dashed",
-              borderRadius: "20px",
-              boxShadow: "0 6px 0 rgba(0,0,0,0.03)"
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                <span style={{ fontSize: "2.5rem" }}>{isPremium(currentStudent) ? "💎" : "🆓"}</span>
-                <div style={{ textAlign: "left" }}>
-                  <h4 style={{ margin: 0, fontSize: "1.15rem", fontWeight: "900", color: "var(--text-primary)" }}>
-                    Account Tier: {currentStudent?.tier === "paid" ? "Premium Learner" : (isPremium(currentStudent) ? "Premium Trial" : "Free Learner")}
-                  </h4>
-                  <p style={{ margin: "4px 0 0 0", fontSize: "0.85rem", color: "var(--text-secondary)", fontWeight: "600" }}>
-                    {isPremium(currentStudent)
-                      ? (currentStudent?.tier === "paid"
-                          ? "You have full access to send requests & view friends' game scores! 🚀"
-                          : "Premium Trial active! Call Frog Uncle to extend! 🐸")
-                      : "Upgrade to premium to send requests & see friends' highscores! ✨"}
-                  </p>
-                </div>
-              </div>
-              
-              {currentStudent?.tier !== "paid" && (
-                <button
-                  onClick={handleUpgradeToPremium}
-                  className="btn btn-success animate-tag-pulse"
-                  style={{
-                    padding: "10px 18px",
-                    fontSize: "0.9rem",
-                    fontWeight: "800",
-                    borderRadius: "12px",
-                    boxShadow: "0 4px 0 #16a34a",
-                    border: "none",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px"
-                  }}
-                >
-                  <span>💎 Upgrade Now</span>
-                </button>
-              )}
-            </div>
-          </PlayCard>
-
-          {/* Add Friend Panel */}
-          <PlayCard style={{ padding: "20px", borderRadius: "20px" }}>
-            <h4 style={{ margin: "0 0 12px 0", fontSize: "1.1rem", fontWeight: "900", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "8px" }}>
-              <span>➕ Add a Buddy</span>
-            </h4>
-            
-            <form onSubmit={handleSendFriendRequest} style={{ display: "flex", gap: "10px", alignItems: "stretch", flexWrap: "wrap" }}>
-              <input
-                type="tel"
-                value={friendPhone}
-                onChange={(e) => setFriendPhone(e.target.value)}
-                placeholder="Enter parent's phone number (e.g. 1234567890)"
-                disabled={!isPremium(currentStudent) || isSearchingFriend}
-                style={{
-                  flex: 1,
-                  minWidth: "200px",
-                  padding: "12px 16px",
-                  fontSize: "1rem",
-                  borderRadius: "12px",
-                  border: "3.5px solid #cbd5e1",
-                  fontWeight: "600",
-                  backgroundColor: isPremium(currentStudent) ? "var(--bg-primary)" : "#f1f5f9",
-                  color: "var(--text-primary)"
-                }}
-              />
-              <button
-                type="submit"
-                disabled={!isPremium(currentStudent) || isSearchingFriend || !friendPhone.trim()}
-                className="btn btn-primary"
-                style={{
-                  padding: "12px 24px",
-                  fontSize: "1rem",
-                  fontWeight: "800",
-                  borderRadius: "12px",
-                  boxShadow: "0 4px 0 var(--accent-secondary)",
-                  border: "none",
-                  cursor: (!isPremium(currentStudent) || isSearchingFriend || !friendPhone.trim()) ? "not-allowed" : "pointer"
-                }}
-              >
-                {isSearchingFriend ? "Searching..." : "Send Request 🚀"}
-              </button>
-            </form>
-            {!isPremium(currentStudent) && (
-              <p style={{ margin: "8px 0 0 0", fontSize: "0.8rem", color: "#ef4444", fontWeight: "700" }}>
-                🔒 Upgrading to Premium is required to invite friends by phone number.
-              </p>
-            )}
-          </PlayCard>
-
-          {/* Pending Requests Panel */}
-          {(friendRequests.filter(r => r.status === "pending").length > 0) && (
-            <PlayCard style={{ padding: "20px", borderRadius: "20px" }}>
-              <h4 style={{ margin: "0 0 16px 0", fontSize: "1.1rem", fontWeight: "900", color: "var(--text-primary)" }}>
-                🔔 Pending Requests
-              </h4>
-              
-              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                {/* Received Requests */}
-                {friendRequests.filter(r => r.receiverId === currentStudent?.id && r.status === "pending").map(req => (
-                  <div
-                    key={req.id}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      backgroundColor: "var(--bg-primary)",
-                      border: "2px solid #e2e8f0",
-                      borderRadius: "14px",
-                      padding: "12px 16px",
-                      flexWrap: "wrap",
-                      gap: "10px"
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <span style={{ fontSize: "1.5rem" }}>👋</span>
-                      <div style={{ textAlign: "left" }}>
-                        <strong style={{ fontSize: "0.95rem" }}>{req.senderName}</strong> wants to be friends!
-                        <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>Phone: {req.senderPhone || "N/A"}</div>
-                      </div>
-                    </div>
-                    <div style={{ display: "flex", gap: "8px" }}>
-                      <button
-                        onClick={() => handleAcceptRequest(req.id, req.senderName)}
-                        className="btn btn-success"
-                        style={{ padding: "8px 14px", fontSize: "0.85rem", borderRadius: "10px", border: "none", cursor: "pointer", boxShadow: "0 3px 0 #16a34a" }}
-                      >
-                        Accept ✔
-                      </button>
-                      <button
-                        onClick={() => handleDeclineRequest(req.id, req.senderName)}
-                        style={{
-                          padding: "8px 14px",
-                          fontSize: "0.85rem",
-                          borderRadius: "10px",
-                          border: "2px solid #fca5a5",
-                          backgroundColor: "#fee2e2",
-                          color: "#b91c1c",
-                          fontWeight: "800",
-                          cursor: "pointer",
-                          boxShadow: "0 3px 0 #ef4444"
-                        }}
-                      >
-                        Decline ✖
-                      </button>
-                    </div>
-                  </div>
-                ))}
-
-                {/* Sent Requests */}
-                {friendRequests.filter(r => r.senderId === currentStudent?.id && r.status === "pending").map(req => (
-                  <div
-                    key={req.id}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      backgroundColor: "var(--bg-primary)",
-                      border: "2px solid #e2e8f0",
-                      borderRadius: "14px",
-                      padding: "12px 16px",
-                      flexWrap: "wrap",
-                      gap: "10px"
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <span style={{ fontSize: "1.3rem" }}>✉</span>
-                      <div style={{ textAlign: "left" }}>
-                        Sent request to <strong style={{ fontSize: "0.95rem" }}>{req.receiverName}</strong>
-                        <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>Phone: {req.receiverPhone || "N/A"}</div>
-                      </div>
-                    </div>
-                    <div>
-                      <span style={{ fontSize: "0.8rem", color: "#b45309", backgroundColor: "#fffbeb", padding: "4px 8px", borderRadius: "8px", fontWeight: "800", marginRight: "8px" }}>
-                        Waiting... ⌛
-                      </span>
-                      <button
-                        onClick={() => handleDeclineRequest(req.id, req.receiverName)}
-                        style={{
-                          padding: "6px 10px",
-                          fontSize: "0.8rem",
-                          borderRadius: "8px",
-                          border: "1.5px solid #cbd5e1",
-                          backgroundColor: "#f1f5f9",
-                          color: "#475569",
-                          fontWeight: "800",
-                          cursor: "pointer"
-                        }}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </PlayCard>
-          )}
-
-          {/* My Own Highscores (For flexing) */}
-          {isPremium(currentStudent) && myHighscores.length > 0 && (
-            <PlayCard style={{ padding: "20px", borderRadius: "20px" }}>
-              <h4 style={{ margin: "0 0 16px 0", fontSize: "1.1rem", fontWeight: "900", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "8px" }}>
-                <span>🏆 My Highscores (Brag & Flex)</span>
-              </h4>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "12px" }}>
-                {myHighscores.map(hs => (
-                  <div
-                    key={hs.gameId}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      backgroundColor: "var(--bg-secondary)",
-                      border: "2px solid #cbd5e1",
-                      borderRadius: "14px",
-                      padding: "10px 14px"
-                    }}
-                  >
-                    <div style={{ textAlign: "left" }}>
-                      <strong style={{ fontSize: "0.9rem", color: "var(--text-primary)" }}>{hs.title}</strong>
-                      <div style={{ fontSize: "0.8rem", color: "var(--accent-primary)", fontWeight: "900", marginTop: "2px" }}>
-                        🎯 Max Score: {hs.maxCorrect} correct
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => {
-                        setActiveFlexGame({ gameId: hs.gameId, title: hs.title, score: hs.maxCorrect });
-                        setShowFlexModal(true);
-                      }}
-                      className="btn btn-success"
-                      style={{
-                        padding: "6px 12px",
-                        fontSize: "0.8rem",
-                        fontWeight: "800",
-                        borderRadius: "8px",
-                        border: "none",
-                        cursor: "pointer",
-                        boxShadow: "0 3px 0 #16a34a"
-                      }}
-                    >
-                      💪 Flex
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </PlayCard>
-          )}
-
-          {/* Challenge & Flex Notifications Inbox */}
-          {isPremium(currentStudent) && (
-            <PlayCard style={{ padding: "20px", borderRadius: "20px" }}>
-              <h4 style={{ margin: "0 0 16px 0", fontSize: "1.1rem", fontWeight: "900", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "8px" }}>
-                <span>📬 Social Inbox</span>
-              </h4>
-              
-              {(() => {
-                const visibleInboxChallenges = challenges.filter(chall => {
-                  const isReceived = chall.receiverId === currentStudent?.id;
-                  if (chall.type === "flex") {
-                    return isReceived;
-                  }
-                  if (isReceived) {
-                    return chall.status === "pending" || chall.status === "completed";
-                  } else {
-                    return chall.status === "completed";
-                  }
-                });
-
-                if (visibleInboxChallenges.length === 0) {
-                  return (
-                    <div style={{ textAlign: "center", padding: "30px 10px", color: "var(--text-secondary)", fontWeight: "600" }}>
-                      <span style={{ fontSize: "2.5rem", display: "block", marginBottom: "8px" }}>🎈</span>
-                      No Challenge / Flex from your Buddy
-                    </div>
-                  );
-                }
-
-                return (
-                  <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                    {visibleInboxChallenges.map(chall => {
-                      const isReceived = chall.receiverId === currentStudent?.id;
-                      
-                      if (chall.type === "flex") {
-                        return (
-                          <div
-                            key={chall.id}
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                              backgroundColor: "#f0fdf4",
-                              border: "2.5px solid #86efac",
-                              borderRadius: "14px",
-                              padding: "12px 16px",
-                              flexWrap: "wrap",
-                              gap: "10px"
-                            }}
-                          >
-                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                              <span style={{ fontSize: "1.5rem" }}>💪</span>
-                              <div style={{ textAlign: "left" }}>
-                                <strong>{chall.senderName}</strong> flexed a score of <strong>{chall.senderScore}</strong> correct in <strong>{chall.gameTitle}</strong>! Can you beat it? 🏆
-                                <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>Sent: {new Date(chall.createdAt).toLocaleTimeString()}</div>
-                              </div>
-                            </div>
-                            <button
-                              onClick={() => handleDismissChallenge(chall.id)}
-                              style={{
-                                padding: "6px 12px",
-                                fontSize: "0.8rem",
-                                borderRadius: "8px",
-                                border: "1.5px solid #cbd5e1",
-                                backgroundColor: "#ffffff",
-                                color: "#475569",
-                                fontWeight: "800",
-                                cursor: "pointer"
-                              }}
-                            >
-                              Cool! 👍
-                            </button>
-                          </div>
-                        );
-                      }
-
-                      // It is a challenge
-                      if (isReceived) {
-                        if (chall.status === "pending") {
-                          return (
-                            <div
-                              key={chall.id}
-                              style={{
-                                display: "flex",
-                                justifyContent: "space-between",
-                                alignItems: "center",
-                                backgroundColor: "#eff6ff",
-                                border: "2.5px solid #bfdbfe",
-                                borderRadius: "14px",
-                                padding: "12px 16px",
-                                flexWrap: "wrap",
-                                gap: "10px"
-                              }}
-                            >
-                              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                                <span style={{ fontSize: "1.5rem" }}>⚔️</span>
-                                <div style={{ textAlign: "left" }}>
-                                  <strong>{chall.senderName}</strong> challenged you to beat their score of <strong>{chall.senderScore}</strong> correct in <strong>{chall.gameTitle}</strong>!
-                                  <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>Sent: {new Date(chall.createdAt).toLocaleTimeString()}</div>
-                                </div>
-                              </div>
-                              <div style={{ display: "flex", gap: "8px" }}>
-                                <button
-                                  onClick={() => handlePlayChallenge(chall)}
-                                  className="btn btn-primary animate-tag-pulse"
-                                  style={{ padding: "8px 14px", fontSize: "0.85rem", borderRadius: "10px", border: "none", cursor: "pointer", boxShadow: "0 3px 0 var(--accent-secondary)" }}
-                                >
-                                  Play & Beat it! 🎮
-                                </button>
-                                <button
-                                  onClick={() => handleDismissChallenge(chall.id)}
-                                  style={{
-                                    padding: "8px 14px",
-                                    fontSize: "0.85rem",
-                                    borderRadius: "10px",
-                                    border: "1.5px solid #cbd5e1",
-                                    backgroundColor: "#ffffff",
-                                    color: "#475569",
-                                    fontWeight: "800",
-                                    cursor: "pointer"
-                                  }}
-                                >
-                                  Ignore
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        } else {
-                          const receiverBeatSender = (chall.receiverScore || 0) >= chall.senderScore;
-                          return (
-                            <div
-                              key={chall.id}
-                              style={{
-                                display: "flex",
-                                justifyContent: "space-between",
-                                alignItems: "center",
-                                backgroundColor: receiverBeatSender ? "#ecfdf5" : "#fff5f5",
-                                border: receiverBeatSender ? "2.5px solid #a7f3d0" : "2.5px solid #fecaca",
-                                borderRadius: "14px",
-                                padding: "12px 16px",
-                                flexWrap: "wrap",
-                                gap: "10px"
-                              }}
-                            >
-                              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                                <span style={{ fontSize: "1.5rem" }}>{receiverBeatSender ? "🏆" : "🧸"}</span>
-                                <div style={{ textAlign: "left" }}>
-                                  {receiverBeatSender ? (
-                                    <span>You beat <strong>{chall.senderName}</strong>'s challenge! (You scored <strong>{chall.receiverScore}</strong>, beating their score of <strong>{chall.senderScore}</strong> in <strong>{chall.gameTitle}</strong>!) 🎉</span>
-                                  ) : (
-                                    <span>You played <strong>{chall.senderName}</strong>'s challenge. (You scored <strong>{chall.receiverScore}</strong>. They scored <strong>{chall.senderScore}</strong> in <strong>{chall.gameTitle}</strong>). Keep practicing! 😊</span>
-                                  )}
-                                  <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>Completed: {new Date(chall.createdAt).toLocaleDateString()}</div>
-                                </div>
-                              </div>
-                              <button
-                                onClick={() => handleDismissChallenge(chall.id)}
-                                style={{
-                                  padding: "6px 12px",
-                                  fontSize: "0.8rem",
-                                  borderRadius: "8px",
-                                  border: "1.5px solid #cbd5e1",
-                                  backgroundColor: "#ffffff",
-                                  color: "#475569",
-                                  fontWeight: "800",
-                                  cursor: "pointer"
-                                }}
-                              >
-                                Dismiss
-                              </button>
-                            </div>
-                          );
-                        }
-                      } else {
-                        // Sent challenges updates
-                        const receiverBeatSender = (chall.receiverScore || 0) >= chall.senderScore;
-                        return (
-                          <div
-                            key={chall.id}
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                              backgroundColor: "#faf5ff",
-                              border: "2.5px solid #e9d5ff",
-                              borderRadius: "14px",
-                              padding: "12px 16px",
-                              flexWrap: "wrap",
-                              gap: "10px"
-                            }}
-                          >
-                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                              <span style={{ fontSize: "1.5rem" }}>🏁</span>
-                              <div style={{ textAlign: "left" }}>
-                                <strong>{chall.receiverName}</strong> completed your challenge in <strong>{chall.gameTitle}</strong>!<br />
-                                Score details: {chall.receiverName}: <strong>{chall.receiverScore}</strong> vs You: <strong>{chall.senderScore}</strong>.
-                                {receiverBeatSender ? " They beat your score! 😮" : " You stayed ahead! 😎"}
-                              </div>
-                            </div>
-                            <button
-                              onClick={() => handleDismissChallenge(chall.id)}
-                              style={{
-                                padding: "6px 12px",
-                                fontSize: "0.8rem",
-                                borderRadius: "8px",
-                                border: "1.5px solid #cbd5e1",
-                                backgroundColor: "#ffffff",
-                                color: "#475569",
-                                fontWeight: "800",
-                                cursor: "pointer"
-                              }}
-                            >
-                              Dismiss
-                            </button>
-                          </div>
-                        );
-                      }
-                    })}
-                  </div>
-                );
-              })()}
-            </PlayCard>
-          )}
-
-          {/* My Friends List */}
-          <PlayCard style={{ padding: "20px", borderRadius: "20px" }}>
-            <h4 style={{ margin: "0 0 16px 0", fontSize: "1.1rem", fontWeight: "900", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "8px" }}>
-              <span>👥 My Friends ({friendsList.length})</span>
-            </h4>
-            
-            {friendsList.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "30px 10px", color: "var(--text-secondary)", fontWeight: "600" }}>
-                <span style={{ fontSize: "2.5rem", display: "block", marginBottom: "8px" }}>🎈</span>
-                No friends added yet. Invite your classmates to check out their progress!
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                {friendsList.map(friend => {
-                  const isExpanded = expandedFriendId === friend.id;
-                  const logs = friendLogs[friend.id] || [];
-                  
-                  // Group logs by gameId to calculate high scores
-                  const playedGamesMap: Record<string, { title: string; maxCorrect: number; totalAttempts: number }> = {};
-                  logs.forEach(log => {
-                    if (!playedGamesMap[log.gameId]) {
-                      playedGamesMap[log.gameId] = {
-                        title: log.gameTitle,
-                        maxCorrect: log.correctAnswers,
-                        totalAttempts: 1
-                      };
-                    } else {
-                      playedGamesMap[log.gameId].maxCorrect = Math.max(playedGamesMap[log.gameId].maxCorrect, log.correctAnswers);
-                      playedGamesMap[log.gameId].totalAttempts += 1;
-                    }
-                  });
-                  const playedGames = Object.values(playedGamesMap);
-
-                  // Find the request ID to allow unfriending
-                  const relRequest = friendRequests.find(r => 
-                    r.status === "accepted" && 
-                    ((r.senderId === currentStudent?.id && r.receiverId === friend.id) || 
-                     (r.senderId === friend.id && r.receiverId === currentStudent?.id))
-                  );
-
-                  return (
-                    <div
-                      key={friend.id}
-                      style={{
-                        border: isExpanded ? "3px solid var(--accent-primary)" : "2px solid #cbd5e1",
-                        borderRadius: "18px",
-                        overflow: "hidden",
-                        backgroundColor: "var(--bg-secondary)",
-                        transition: "all 0.2s ease"
-                      }}
-                    >
-                      {/* Friend Info Header Row */}
-                      <div
-                        onClick={() => setExpandedFriendId(isExpanded ? null : friend.id)}
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          padding: "14px 18px",
-                          cursor: "pointer",
-                          userSelect: "none",
-                          backgroundColor: isExpanded ? "rgba(79, 70, 229, 0.05)" : "transparent"
-                        }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                          <AvatarIcon avatarId={friend.avatar} size="sm" />
-                          <div style={{ textAlign: "left" }}>
-                            <strong style={{ fontSize: "1.05rem", color: "var(--text-primary)" }}>{friend.name}</strong>
-                            <div style={{ display: "flex", gap: "8px", marginTop: "2px" }}>
-                              <span style={{ fontSize: "0.8rem", color: "#b45309", fontWeight: "700" }}>⭐ {friend.stars} Stars</span>
-                              <span style={{ fontSize: "0.8rem", color: "#16a34a", fontWeight: "700" }}>🔥 {friend.streak} Streak</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                          {isPremium(currentStudent) && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActiveChallengeFriend(friend);
-                                setShowChallengeModal(true);
-                              }}
-                              className="btn btn-primary"
-                              style={{
-                                padding: "6px 12px",
-                                fontSize: "0.8rem",
-                                fontWeight: "800",
-                                borderRadius: "8px",
-                                border: "none",
-                                cursor: "pointer",
-                                boxShadow: "0 3px 0 var(--accent-secondary)",
-                                marginRight: "4px"
-                              }}
-                            >
-                              ⚔️ Challenge
-                            </button>
-                          )}
-                          <span style={{ fontSize: "1.2rem" }}>
-                            {isExpanded ? "🔼" : "🔽"}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Expanded Section (High Scores) */}
-                      {isExpanded && (
-                        <div
-                          style={{
-                            padding: "16px 18px",
-                            backgroundColor: "var(--bg-primary)",
-                            borderTop: "2px dashed #cbd5e1"
-                          }}
-                        >
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-                            <span style={{ fontSize: "0.9rem", fontWeight: "800", color: "var(--text-secondary)" }}>
-                              🎮 Games & Highscores
-                            </span>
-                            
-                            {/* Unfriend Button */}
-                            {relRequest && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (confirm(`Are you sure you want to remove ${friend.name} from friends?`)) {
-                                    handleDeclineRequest(relRequest.id, friend.name, true);
-                                  }
-                                }}
-                                style={{
-                                  padding: "4px 10px",
-                                  fontSize: "0.75rem",
-                                  backgroundColor: "transparent",
-                                  border: "1.5px solid #fca5a5",
-                                  color: "#b91c1c",
-                                  borderRadius: "8px",
-                                  fontWeight: "800",
-                                  cursor: "pointer"
-                                }}
-                              >
-                                Unfriend ✖
-                              </button>
-                            )}
-                          </div>
-
-                          {!isPremium(currentStudent) ? (
-                            /* Premium Locked Highscores for Free Users */
-                            <div
-                              style={{
-                                textAlign: "center",
-                                padding: "20px 10px",
-                                backgroundColor: "rgba(239, 68, 68, 0.05)",
-                                border: "2px dashed #fca5a5",
-                                borderRadius: "14px",
-                                display: "flex",
-                                flexDirection: "column",
-                                alignItems: "center",
-                                gap: "8px"
-                              }}
-                            >
-                              <span style={{ fontSize: "2rem" }}>🔒</span>
-                              <strong style={{ fontSize: "0.9rem", color: "#b91c1c" }}>High Scores Locked</strong>
-                              <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--text-secondary)", fontWeight: "600", lineHeight: "1.4" }}>
-                                Viewing friend high scores is a premium feature.<br />
-                                Upgrade your account to unlock this feature!
-                              </p>
-                              <button
-                                onClick={handleUpgradeToPremium}
-                                className="btn btn-success"
-                                style={{ padding: "6px 12px", fontSize: "0.8rem", borderRadius: "8px", marginTop: "4px" }}
-                              >
-                                💎 Upgrade Now
-                              </button>
-                            </div>
-                          ) : (
-                            /* Scores List for Premium Users */
-                            <div>
-                              {playedGames.length === 0 ? (
-                                <div style={{ color: "var(--text-secondary)", fontSize: "0.85rem", fontStyle: "italic", textAlign: "center", padding: "10px 0" }}>
-                                  This friend hasn't played any games yet. 🎮
-                                </div>
-                              ) : (
-                                <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "8px" }}>
-                                  {playedGames.map(game => (
-                                    <div
-                                      key={game.title}
-                                      style={{
-                                        display: "flex",
-                                        justifyContent: "space-between",
-                                        alignItems: "center",
-                                        backgroundColor: "var(--bg-secondary)",
-                                        padding: "10px 14px",
-                                        borderRadius: "10px",
-                                        border: "1.5px solid #e2e8f0"
-                                      }}
-                                    >
-                                      <span style={{ fontSize: "0.9rem", fontWeight: "800", color: "var(--text-primary)" }}>
-                                        {game.title}
-                                      </span>
-                                      <div style={{ display: "flex", gap: "10px" }}>
-                                        <span style={{ fontSize: "0.85rem", color: "var(--accent-primary)", fontWeight: "900", backgroundColor: "rgba(79, 70, 229, 0.08)", padding: "3px 8px", borderRadius: "6px" }}>
-                                          🎯 Max Score: {game.maxCorrect} correct
-                                        </span>
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </PlayCard>
-        </div>
+        <FriendsHub
+          currentStudent={currentStudent}
+          isPremium={isPremium}
+          socialError={socialError}
+          socialSuccess={socialSuccess}
+          handleUpgradeToPremium={handleUpgradeToPremium}
+          friendPhone={friendPhone}
+          setFriendPhone={setFriendPhone}
+          isSearchingFriend={isSearchingFriend}
+          handleSendFriendRequest={handleSendFriendRequest}
+          friendRequests={friendRequests}
+          handleAcceptRequest={handleAcceptRequest}
+          handleDeclineRequest={handleDeclineRequest}
+          myHighscores={myHighscores}
+          setActiveFlexGame={setActiveFlexGame}
+          setShowFlexModal={setShowFlexModal}
+          challenges={challenges}
+          handleDismissChallenge={handleDismissChallenge}
+          handlePlayChallenge={handlePlayChallenge}
+          friendsList={friendsList}
+          expandedFriendId={expandedFriendId}
+          setExpandedFriendId={setExpandedFriendId}
+          friendLogs={friendLogs}
+          setActiveChallengeFriend={setActiveChallengeFriend}
+          setShowChallengeModal={setShowChallengeModal}
+        />
       )}
 
       {/* Exit Dashboard using kids-friendly exit door */}
@@ -1988,614 +833,414 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {/* Accidental Log-out protection modal */}
-      {showExitConfirm && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: "rgba(15, 23, 42, 0.4)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 1000,
-            padding: "20px",
-            backdropFilter: "blur(5px)"
-          }}
-        >
-          <PlayCard
+      <KidsModal
+        isOpen={showExitConfirm}
+        onClose={() => setShowExitConfirm(false)}
+        zIndex={1000}
+        maxWidth="350px"
+      >
+        <div style={{ fontSize: "3.5rem", animation: "bounce 2s infinite" }}>🚪</div>
+        <h3 style={{ fontSize: "1.45rem", fontWeight: "900", color: "var(--text-primary)", margin: 0 }}>
+          Are you leaving?
+        </h3>
+        <p style={{ color: "var(--text-secondary)", fontWeight: "700", fontSize: "0.95rem", margin: 0, lineHeight: "1.4" }}>
+          Do you really want to close your dashboard and exit?
+        </p>
+        <div style={{ display: "flex", flexDirection: "column", gap: "10px", width: "100%" }}>
+          <button
+            autoFocus
+            onClick={() => setShowExitConfirm(false)}
+            className="btn btn-success"
+            style={{ width: "100%", padding: "14px", fontSize: "1.1rem", fontWeight: "800", boxShadow: "0 4px 0 #16a34a" }}
+          >
+            🎮 Keep Playing!
+          </button>
+          <button
+            onClick={handleStudentLogOut}
             style={{
-              maxWidth: "350px",
               width: "100%",
-              textAlign: "center",
-              padding: "28px 24px",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: "20px",
-              backgroundColor: "var(--bg-secondary)",
-              border: "4px solid var(--accent-primary)"
+              padding: "10px",
+              fontSize: "0.85rem",
+              backgroundColor: "#fee2e2",
+              border: "2px solid #fca5a5",
+              color: "#b91c1c",
+              borderRadius: "12px",
+              fontWeight: "800",
+              cursor: "pointer",
+              marginTop: "8px"
             }}
           >
-            <div style={{ fontSize: "3.5rem", animation: "bounce 2s infinite" }}>🚪</div>
-            <h3 style={{ fontSize: "1.45rem", fontWeight: "900", color: "var(--text-primary)", margin: 0 }}>
-              Are you leaving?
-            </h3>
-            <p style={{ color: "var(--text-secondary)", fontWeight: "700", fontSize: "0.95rem", margin: 0, lineHeight: "1.4" }}>
-              Do you really want to close your dashboard and exit?
-            </p>
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px", width: "100%" }}>
-              <button
-                onClick={() => setShowExitConfirm(false)}
-                className="btn btn-success"
-                style={{ width: "100%", padding: "14px", fontSize: "1.1rem", fontWeight: "800", boxShadow: "0 4px 0 #16a34a" }}
-              >
-                🎮 Keep Playing!
-              </button>
-              <button
-                onClick={handleStudentLogOut}
-                style={{
-                  width: "100%",
-                  padding: "10px",
-                  fontSize: "0.85rem",
-                  backgroundColor: "#fee2e2",
-                  border: "2px solid #fca5a5",
-                  color: "#b91c1c",
-                  borderRadius: "12px",
-                  fontWeight: "800",
-                  cursor: "pointer",
-                  marginTop: "8px"
-                }}
-              >
-                🚪 Yes, Exit
-              </button>
-            </div>
-          </PlayCard>
+            🚪 Yes, Exit
+          </button>
         </div>
-      )}
+      </KidsModal>
 
       {/* 1. Request Game Idea Modal */}
-      {showRequestModal && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: "rgba(15, 23, 42, 0.5)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 10000,
-            padding: "20px",
-            backdropFilter: "blur(5px)"
-          }}
-        >
-          <PlayCard
+      <KidsModal
+        isOpen={showRequestModal}
+        onClose={() => setShowRequestModal(false)}
+        maxWidth="420px"
+        padding="24px"
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "2.5px dashed #cbd5e1", paddingBottom: "12px", width: "100%" }}>
+          <h3 style={{ fontSize: "1.3rem", fontWeight: "900", color: "var(--text-primary)", margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
+            <span>💡 Shared Idea Studio</span>
+          </h3>
+          <button
+            onClick={() => setShowRequestModal(false)}
             style={{
-              maxWidth: "420px",
-              width: "100%",
-              padding: "24px",
-              display: "flex",
-              flexDirection: "column",
-              gap: "20px",
-              backgroundColor: "var(--bg-secondary)",
-              border: "4px solid var(--accent-primary)",
-              borderRadius: "24px",
-              boxShadow: "0 12px 24px rgba(0,0,0,0.15)"
+              background: "none",
+              border: "none",
+              fontSize: "1.8rem",
+              cursor: "pointer",
+              fontWeight: "900",
+              color: "var(--text-secondary)"
             }}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "2.5px dashed #cbd5e1", paddingBottom: "12px" }}>
-              <h3 style={{ fontSize: "1.3rem", fontWeight: "900", color: "var(--text-primary)", margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
-                <span>💡 Shared Idea Studio</span>
-              </h3>
-              <button
-                onClick={() => setShowRequestModal(false)}
-                style={{
-                  background: "none",
-                  border: "none",
-                  fontSize: "1.8rem",
-                  cursor: "pointer",
-                  fontWeight: "900",
-                  color: "var(--text-secondary)"
-                }}
-              >
-                ×
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmitIdea} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-              <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: "0.95rem", fontWeight: "600", lineHeight: "1.4" }}>
-                What kind of game do you want to play? Write or describe your game idea below:
-              </p>
-
-              <textarea
-                value={requestIdeaText}
-                onChange={(e) => setRequestIdeaText(e.target.value)}
-                placeholder="E.g., 'I want a balloon counting game with cute dinosaurs!' or 'A puzzle game where I match shapes!'"
-                rows={4}
-                required
-                style={{
-                  width: "100%",
-                  padding: "16px",
-                  borderRadius: "16px",
-                  border: "2px solid #cbd5e1",
-                  fontSize: "0.95rem",
-                  fontFamily: "inherit",
-                  resize: "none",
-                  boxSizing: "border-box",
-                  backgroundColor: "var(--bg-primary)"
-                }}
-              />
-
-              <div style={{ display: "flex", gap: "10px", width: "100%" }}>
-                <button
-                  type="button"
-                  onClick={() => setShowRequestModal(false)}
-                  className="btn btn-gray"
-                  style={{ flex: 1, padding: "12px", fontSize: "0.95rem", fontWeight: "800" }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmittingIdea}
-                  className="btn btn-primary"
-                  style={{
-                    flex: 1,
-                    padding: "12px",
-                    fontSize: "0.95rem",
-                    fontWeight: "800",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "8px",
-                    boxShadow: "0 4px 0 var(--accent-secondary)"
-                  }}
-                >
-                  <Send size={16} fill="white" />
-                  <span>{isSubmittingIdea ? "Sending..." : "Send Idea! 🚀"}</span>
-                </button>
-              </div>
-            </form>
-          </PlayCard>
+            ×
+          </button>
         </div>
-      )}
 
-      {/* 2. Idea Success Confetti Popup */}
-      {showIdeaSuccess && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: "rgba(15, 23, 42, 0.4)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 10000,
-            padding: "20px",
-            backdropFilter: "blur(5px)"
-          }}
-        >
-          <PlayCard
+        <form onSubmit={handleSubmitIdea} style={{ display: "flex", flexDirection: "column", gap: "16px", width: "100%" }}>
+          <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: "0.95rem", fontWeight: "600", lineHeight: "1.4", textAlign: "left" }}>
+            What kind of game do you want to play? Write or describe your game idea below:
+          </p>
+
+          <textarea
+            autoFocus
+            value={requestIdeaText}
+            onChange={(e) => setRequestIdeaText(e.target.value)}
+            placeholder="E.g., 'I want a balloon counting game with cute dinosaurs!' or 'A puzzle game where I match shapes!'"
+            rows={4}
+            required
             style={{
-              maxWidth: "360px",
               width: "100%",
-              textAlign: "center",
-              padding: "28px 24px",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: "20px",
-              backgroundColor: "var(--bg-secondary)",
-              border: "4px solid #10b981",
-              borderRadius: "24px"
+              padding: "16px",
+              borderRadius: "16px",
+              border: "2px solid #cbd5e1",
+              fontSize: "0.95rem",
+              fontFamily: "inherit",
+              resize: "none",
+              boxSizing: "border-box",
+              backgroundColor: "var(--bg-primary)"
             }}
-          >
-            <div style={{ fontSize: "3.5rem", animation: "kids-bounce 2s infinite ease-in-out" }}>🎉</div>
-            <h3 style={{ fontSize: "1.4rem", fontWeight: "900", color: "#065f46", margin: 0 }}>
-              Idea Sent! Yay!
-            </h3>
-            <p style={{ color: "var(--text-secondary)", fontWeight: "700", fontSize: "0.95rem", margin: 0, lineHeight: "1.4" }}>
-              Your game suggestion was sent straight to your teacher! Keep checking your dashboard for new games!
-            </p>
+          />
+
+          <div style={{ display: "flex", gap: "10px", width: "100%" }}>
             <button
-              onClick={() => setShowIdeaSuccess(false)}
-              className="btn btn-success"
-              style={{ width: "100%", padding: "14px", fontSize: "1.05rem", fontWeight: "800", boxShadow: "0 4px 0 #16a34a" }}
-            >
-              Okay! 🎈
-            </button>
-          </PlayCard>
-        </div>
-      )}
-
-      {/* 3. Premium Locked Game Dialog */}
-      {showLockModal && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: "rgba(15, 23, 42, 0.4)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 10000,
-            padding: "20px",
-            backdropFilter: "blur(5px)"
-          }}
-        >
-          <PlayCard
-            style={{
-              maxWidth: "360px",
-              width: "100%",
-              textAlign: "center",
-              padding: "28px 24px",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: "20px",
-              backgroundColor: "var(--bg-secondary)",
-              border: "4px solid #ef4444",
-              borderRadius: "24px"
-            }}
-          >
-            <div style={{ fontSize: "3.5rem", animation: "kids-wiggle 2s infinite ease-in-out" }}>
-              {lockedReason === "stars" ? "⭐" : "🔒"}
-            </div>
-            <h3 style={{ fontSize: "1.45rem", fontWeight: "900", color: lockedReason === "stars" ? "#b45309" : "#b91c1c", margin: 0 }}>
-              {lockedReason === "stars" ? "Stars Required!" : "Premium Game!"}
-            </h3>
-            <p style={{ color: "var(--text-secondary)", fontWeight: "700", fontSize: "0.95rem", margin: 0, lineHeight: "1.4" }}>
-              {lockedReason === "stars" ? (
-                <span>
-                  You need <strong>{lockedStarsRequired.toLocaleString()}</strong> Stars to unlock "{lockedGameTitle}".<br />
-                  You currently have <strong>{currentStudent?.stars || 0}</strong> stars. Keep playing to collect more! 🎈
-                </span>
-              ) : (
-                <span>
-                  "{lockedGameTitle}" is a premium quest. Please ask your parent or teacher to unlock it for you!
-                </span>
-              )}
-            </p>
-            <button
-              onClick={() => setShowLockModal(false)}
-              className="btn btn-danger"
-              style={{
-                width: "100%",
-                padding: "14px",
-                fontSize: "1.05rem",
-                fontWeight: "800",
-                backgroundColor: lockedReason === "stars" ? "#d97706" : "#ef4444",
-                borderColor: lockedReason === "stars" ? "#b45309" : "#dc2626",
-                color: "#ffffff",
-                boxShadow: `0 4px 0 ${lockedReason === "stars" ? "#b45309" : "#dc2626"}`
-              }}
-            >
-              {lockedReason === "stars" ? "Okay! 🎮" : "Go Back"}
-            </button>
-          </PlayCard>
-        </div>
-      )}
-
-      {/* 4. Flex selector Modal */}
-      {showFlexModal && activeFlexGame && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: "rgba(15, 23, 42, 0.4)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 10000,
-            padding: "20px",
-            backdropFilter: "blur(5px)"
-          }}
-        >
-          <PlayCard
-            style={{
-              maxWidth: "360px",
-              width: "100%",
-              padding: "24px",
-              backgroundColor: "var(--bg-secondary)",
-              border: "4px solid var(--accent-primary)",
-              borderRadius: "24px",
-              textAlign: "center"
-            }}
-          >
-            <h3 style={{ margin: "0 0 10px 0", fontSize: "1.3rem", fontWeight: "900" }}>
-              💪 Flex Your Score!
-            </h3>
-            <p style={{ color: "var(--text-secondary)", fontSize: "0.95rem", fontWeight: "600", margin: "0 0 20px 0" }}>
-              Flex your score of <strong>{activeFlexGame.score}</strong> in <strong>{activeFlexGame.title}</strong> on a friend:
-            </p>
-
-            {friendsList.length === 0 ? (
-              <p style={{ fontStyle: "italic", fontSize: "0.9rem", color: "var(--text-secondary)", marginBottom: "20px" }}>
-                Add some friends first to flex your scores!
-              </p>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "200px", overflowY: "auto", marginBottom: "20px" }}>
-                {friendsList.map(friend => (
-                  <button
-                    key={friend.id}
-                    onClick={() => handleFlexScore(friend.id, friend.name)}
-                    className="btn btn-gray"
-                    style={{
-                      padding: "10px",
-                      fontSize: "0.95rem",
-                      fontWeight: "800",
-                      width: "100%",
-                      textAlign: "left",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px"
-                    }}
-                  >
-                    <AvatarIcon avatarId={friend.avatar} size="sm" />
-                    <span>Flex with {friend.name}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-
-            <button
-              onClick={() => setShowFlexModal(false)}
+              type="button"
+              onClick={() => setShowRequestModal(false)}
               className="btn btn-gray"
-              style={{ width: "100%", padding: "12px", fontWeight: "800" }}
-            >
-              Close
-            </button>
-          </PlayCard>
-        </div>
-      )}
-
-      {/* 5. Challenge Game selector Modal */}
-      {showChallengeModal && activeChallengeFriend && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: "rgba(15, 23, 42, 0.4)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 10000,
-            padding: "20px",
-            backdropFilter: "blur(5px)"
-          }}
-        >
-          <PlayCard
-            style={{
-              maxWidth: "360px",
-              width: "100%",
-              padding: "24px",
-              backgroundColor: "var(--bg-secondary)",
-              border: "4px solid var(--accent-primary)",
-              borderRadius: "24px",
-              textAlign: "center"
-            }}
-          >
-            <h3 style={{ margin: "0 0 10px 0", fontSize: "1.3rem", fontWeight: "900" }}>
-              ⚔️ Challenge {activeChallengeFriend.name}!
-            </h3>
-            <p style={{ color: "var(--text-secondary)", fontSize: "0.95rem", fontWeight: "600", margin: "0 0 20px 0" }}>
-              Select a game to challenge them:
-            </p>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "250px", overflowY: "auto", marginBottom: "20px" }}>
-              {games.map(game => (
-                <button
-                  key={game.id}
-                  onClick={() => handleSendChallenge(game.id, game.title)}
-                  className="btn btn-gray"
-                  style={{
-                    padding: "10px",
-                    fontSize: "0.95rem",
-                    fontWeight: "800",
-                    width: "100%",
-                    textAlign: "left"
-                  }}
-                >
-                  {game.title}
-                </button>
-              ))}
-            </div>
-
-            <button
-              onClick={() => setShowChallengeModal(false)}
-              className="btn btn-gray"
-              style={{ width: "100%", padding: "12px", fontWeight: "800" }}
+              style={{ flex: 1, padding: "12px", fontSize: "0.95rem", fontWeight: "800" }}
             >
               Cancel
             </button>
-          </PlayCard>
-        </div>
-      )}
-
-      {/* 6. Frog Uncle Premium Upgrade Modal */}
-      {showFrogModal && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: "rgba(15, 23, 42, 0.4)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 10005,
-            padding: "20px",
-            backdropFilter: "blur(5px)"
-          }}
-        >
-          <PlayCard
-            style={{
-              maxWidth: "380px",
-              width: "100%",
-              padding: "28px 24px",
-              backgroundColor: "#f0fdf4",
-              border: "4px solid #22c55e",
-              borderRadius: "24px",
-              textAlign: "center",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: "16px",
-              boxShadow: "0 12px 24px rgba(34, 197, 94, 0.15)"
-            }}
-          >
-            <div style={{ fontSize: "4.5rem", animation: "kids-wiggle 2s infinite ease-in-out" }}>🐸</div>
-            
-            <h3 style={{ margin: 0, fontSize: "1.6rem", fontWeight: "900", color: "#166534" }}>
-              Frog Uncle's Magic! ✨
-            </h3>
-            
-            <p style={{ color: "#1b6535", fontSize: "1.05rem", fontWeight: "700", margin: 0, lineHeight: "1.5" }}>
-              Want to unlock Premium and play games with your friends? <br />
-              Ask your parent to call <strong>Frog Uncle</strong>! 📞
-            </p>
-
-            <a
-              href="tel:+919871229599"
-              className="btn btn-success"
+            <button
+              type="submit"
+              disabled={isSubmittingIdea}
+              className="btn btn-primary"
               style={{
-                width: "100%",
-                padding: "14px",
-                fontSize: "1.1rem",
-                fontWeight: "900",
-                backgroundColor: "#22c55e",
-                borderColor: "#16a34a",
-                color: "#ffffff",
-                borderRadius: "16px",
-                display: "inline-flex",
+                flex: 1,
+                padding: "12px",
+                fontSize: "0.95rem",
+                fontWeight: "800",
+                display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 gap: "8px",
-                boxShadow: "0 4px 0 #16a34a",
-                textDecoration: "none",
-                cursor: "pointer"
+                boxShadow: "0 4px 0 var(--accent-secondary)"
               }}
             >
-              <span>📞 Call Frog Uncle</span>
-            </a>
+              <Send size={16} fill="white" />
+              <span>{isSubmittingIdea ? "Sending..." : "Send Idea! 🚀"}</span>
+            </button>
+          </div>
+        </form>
+      </KidsModal>
 
-            <div style={{ display: "flex", gap: "10px", width: "100%", marginTop: "8px" }}>
-              <button
-                onClick={() => setShowFrogModal(false)}
-                className="btn btn-gray"
-                style={{
-                  width: "100%",
-                  padding: "12px",
-                  fontSize: "0.95rem",
-                  fontWeight: "800"
-                }}
-              >
-                Not Now
-              </button>
-            </div>
-          </PlayCard>
+      {/* 2. Idea Success Confetti Popup */}
+      <KidsModal
+        isOpen={showIdeaSuccess}
+        onClose={() => setShowIdeaSuccess(false)}
+        borderColor="#10b981"
+        maxWidth="360px"
+      >
+        <div style={{ fontSize: "3.5rem", animation: "kids-bounce 2s infinite ease-in-out" }}>🎉</div>
+        <h3 style={{ fontSize: "1.4rem", fontWeight: "900", color: "#065f46", margin: 0 }}>
+          Idea Sent! Yay!
+        </h3>
+        <p style={{ color: "var(--text-secondary)", fontWeight: "700", fontSize: "0.95rem", margin: 0, lineHeight: "1.4" }}>
+          Your game suggestion was sent straight to your teacher! Keep checking your dashboard for new games!
+        </p>
+        <button
+          autoFocus
+          onClick={() => setShowIdeaSuccess(false)}
+          className="btn btn-success"
+          style={{ width: "100%", padding: "14px", fontSize: "1.05rem", fontWeight: "800", boxShadow: "0 4px 0 #16a34a" }}
+        >
+          Okay! 🎈
+            </button>
+      </KidsModal>
+
+      {/* 3. Premium Locked Game Dialog */}
+      <KidsModal
+        isOpen={showLockModal}
+        onClose={() => setShowLockModal(false)}
+        borderColor="#ef4444"
+        maxWidth="360px"
+      >
+        <div style={{ fontSize: "3.5rem", animation: "kids-wiggle 2s infinite ease-in-out" }}>
+          {lockedReason === "stars" ? "⭐" : "🔒"}
         </div>
-      )}
-
-      {/* 7. Try Premium for 7 days Trial Popup */}
-      {showTrialPopup && (
-        <div
+        <h3 style={{ fontSize: "1.45rem", fontWeight: "900", color: lockedReason === "stars" ? "#b45309" : "#b91c1c", margin: 0 }}>
+          {lockedReason === "stars" ? "Stars Required!" : "Premium Game!"}
+        </h3>
+        <p style={{ color: "var(--text-secondary)", fontWeight: "700", fontSize: "0.95rem", margin: 0, lineHeight: "1.4" }}>
+          {lockedReason === "stars" ? (
+            <span>
+              You need <strong>{lockedStarsRequired.toLocaleString()}</strong> Stars to unlock "{lockedGameTitle}".<br />
+              You currently have <strong>{currentStudent?.stars || 0}</strong> stars. Keep playing to collect more! 🎈
+            </span>
+          ) : (
+            <span>
+              "{lockedGameTitle}" is a premium quest. Please ask your parent or teacher to unlock it for you!
+            </span>
+          )}
+        </p>
+        <button
+          autoFocus
+          onClick={() => setShowLockModal(false)}
+          className="btn btn-danger"
           style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: "rgba(15, 23, 42, 0.45)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 10010,
-            padding: "20px",
-            backdropFilter: "blur(6px)"
+            width: "100%",
+            padding: "14px",
+            fontSize: "1.05rem",
+            fontWeight: "800",
+            backgroundColor: lockedReason === "stars" ? "#d97706" : "#ef4444",
+            borderColor: lockedReason === "stars" ? "#b45309" : "#dc2626",
+            color: "#ffffff",
+            boxShadow: `0 4px 0 ${lockedReason === "stars" ? "#b45309" : "#dc2626"}`
           }}
         >
-          <PlayCard
-            style={{
-              maxWidth: "380px",
-              width: "100%",
-              padding: "32px 24px",
-              backgroundColor: "#eff6ff",
-              border: "4px solid #3b82f6",
-              borderRadius: "24px",
-              textAlign: "center",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: "20px",
-              boxShadow: "0 12px 24px rgba(59, 130, 246, 0.2)"
-            }}
-          >
-            <div style={{ fontSize: "4.5rem", animation: "bounce 2s infinite" }}>🎁</div>
-            
-            <h3 style={{ margin: 0, fontSize: "1.6rem", fontWeight: "900", color: "#1e3a8a" }}>
-              Try Premium Free! 🌟
-            </h3>
-            
-            <p style={{ color: "#1e40af", fontSize: "1.05rem", fontWeight: "700", margin: 0, lineHeight: "1.5" }}>
-              Hey {currentStudent?.name || "there"}! <br />
-              Activate your <strong>7-Day Free Trial</strong> to play custom games, challenge friends, and see high scores!
-            </p>
+          {lockedReason === "stars" ? "Okay! 🎮" : "Go Back"}
+        </button>
+      </KidsModal>
 
-            <button
-              onClick={handleActivateTrial}
-              className="btn btn-success animate-tag-pulse"
-              style={{
-                width: "100%",
-                padding: "16px",
-                fontSize: "1.15rem",
-                fontWeight: "900",
-                backgroundColor: "#22c55e",
-                borderColor: "#16a34a",
-                color: "#ffffff",
-                borderRadius: "16px",
-                boxShadow: "0 4px 0 #16a34a",
-                cursor: "pointer",
-                border: "none"
-              }}
-            >
-              🚀 Start My 7-Day Trial!
-            </button>
+      {/* 4. Flex selector Modal */}
+      <KidsModal
+        isOpen={showFlexModal && !!activeFlexGame}
+        onClose={() => setShowFlexModal(false)}
+        maxWidth="360px"
+        padding="24px"
+      >
+        <h3 style={{ margin: "0 0 10px 0", fontSize: "1.3rem", fontWeight: "900" }}>
+          💪 Flex Your Score!
+        </h3>
+        <p style={{ color: "var(--text-secondary)", fontSize: "0.95rem", fontWeight: "600", margin: "0 0 20px 0" }}>
+          Flex your score of <strong>{activeFlexGame?.score}</strong> in <strong>{activeFlexGame?.title}</strong> on a friend:
+        </p>
 
+        {friendsList.length === 0 ? (
+          <p style={{ fontStyle: "italic", fontSize: "0.9rem", color: "var(--text-secondary)", marginBottom: "20px" }}>
+            Add some friends first to flex your scores!
+          </p>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "200px", overflowY: "auto", WebkitOverflowScrolling: "touch", marginBottom: "20px", width: "100%" }}>
+            {friendsList.map(friend => (
+              <button
+                key={friend.id}
+                onClick={() => handleFlexScore(friend.id, friend.name)}
+                className="btn btn-gray"
+                style={{
+                  padding: "10px",
+                  fontSize: "0.95rem",
+                  fontWeight: "800",
+                  width: "100%",
+                  textAlign: "left",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px"
+                }}
+              >
+                <AvatarIcon avatarId={friend.avatar} size="sm" />
+                <span>Flex with {friend.name}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        <button
+          autoFocus
+          onClick={() => setShowFlexModal(false)}
+          className="btn btn-gray"
+          style={{ width: "100%", padding: "12px", fontWeight: "800" }}
+        >
+          Close
+        </button>
+      </KidsModal>
+
+      {/* 5. Challenge Game selector Modal */}
+      <KidsModal
+        isOpen={showChallengeModal && !!activeChallengeFriend}
+        onClose={() => setShowChallengeModal(false)}
+        maxWidth="360px"
+        padding="24px"
+      >
+        <h3 style={{ margin: "0 0 10px 0", fontSize: "1.3rem", fontWeight: "900" }}>
+          ⚔️ Challenge {activeChallengeFriend?.name}!
+        </h3>
+        <p style={{ color: "var(--text-secondary)", fontSize: "0.95rem", fontWeight: "600", margin: "0 0 20px 0" }}>
+          Select a game to challenge them:
+        </p>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "250px", overflowY: "auto", WebkitOverflowScrolling: "touch", marginBottom: "20px", width: "100%" }}>
+          {games.map(game => (
             <button
-              onClick={() => setShowTrialPopup(false)}
+              key={game.id}
+              onClick={() => handleSendChallenge(game.id, game.title)}
               className="btn btn-gray"
               style={{
-                width: "100%",
                 padding: "10px",
-                fontSize: "0.9rem",
-                fontWeight: "800"
+                fontSize: "0.95rem",
+                fontWeight: "800",
+                width: "100%",
+                textAlign: "left"
               }}
             >
-              Maybe Later
+              {game.title}
             </button>
-          </PlayCard>
+          ))}
         </div>
-      )}
+
+        <button
+          autoFocus
+          onClick={() => setShowChallengeModal(false)}
+          className="btn btn-gray"
+          style={{ width: "100%", padding: "12px", fontWeight: "800" }}
+        >
+          Cancel
+        </button>
+      </KidsModal>
+
+      {/* 6. Frog Uncle Premium Upgrade Modal */}
+      <KidsModal
+        isOpen={showFrogModal}
+        onClose={() => setShowFrogModal(false)}
+        backgroundColor="#f0fdf4"
+        borderColor="#22c55e"
+        maxWidth="380px"
+        padding="28px 24px"
+        gap="16px"
+        style={{ boxShadow: "0 12px 24px rgba(34, 197, 94, 0.15)" }}
+      >
+        <div style={{ fontSize: "4.5rem", animation: "kids-wiggle 2s infinite ease-in-out" }}>🐸</div>
+        
+        <h3 style={{ margin: 0, fontSize: "1.6rem", fontWeight: "900", color: "#166534" }}>
+          Frog Uncle's Magic! ✨
+        </h3>
+        
+        <p style={{ color: "#1b6535", fontSize: "1.05rem", fontWeight: "700", margin: 0, lineHeight: "1.5" }}>
+          Want to unlock Premium and play games with your friends? <br />
+          Ask your parent to call <strong>Frog Uncle</strong>! 📞
+        </p>
+
+        <a
+          autoFocus
+          href="tel:+919871229599"
+          className="btn btn-success"
+          style={{
+            width: "100%",
+            padding: "14px",
+            fontSize: "1.1rem",
+            fontWeight: "900",
+            backgroundColor: "#22c55e",
+            borderColor: "#16a34a",
+            color: "#ffffff",
+            borderRadius: "16px",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "8px",
+            boxShadow: "0 4px 0 #16a34a",
+            textDecoration: "none",
+            cursor: "pointer"
+          }}
+        >
+          <span>📞 Call Frog Uncle</span>
+        </a>
+
+        <div style={{ display: "flex", gap: "10px", width: "100%", marginTop: "8px" }}>
+          <button
+            onClick={() => setShowFrogModal(false)}
+            className="btn btn-gray"
+            style={{
+              width: "100%",
+              padding: "12px",
+              fontSize: "0.95rem",
+              fontWeight: "800"
+            }}
+          >
+            Not Now
+          </button>
+        </div>
+      </KidsModal>
+
+      {/* 7. Try Premium for 7 days Trial Popup */}
+      <KidsModal
+        isOpen={showTrialPopup}
+        onClose={() => setShowTrialPopup(false)}
+        backgroundColor="#eff6ff"
+        borderColor="#3b82f6"
+        maxWidth="380px"
+        padding="32px 24px"
+        zIndex={10010}
+        style={{ boxShadow: "0 12px 24px rgba(59, 130, 246, 0.2)" }}
+      >
+        <div style={{ fontSize: "4.5rem", animation: "bounce 2s infinite" }}>🎁</div>
+        
+        <h3 style={{ margin: 0, fontSize: "1.6rem", fontWeight: "900", color: "#1e3a8a" }}>
+          Try Premium Free! 🌟
+        </h3>
+        
+        <p style={{ color: "#1e40af", fontSize: "1.05rem", fontWeight: "700", margin: 0, lineHeight: "1.5" }}>
+          Hey {currentStudent?.name || "there"}! <br />
+          Activate your <strong>7-Day Free Trial</strong> to play custom games, challenge friends, and see high scores!
+        </p>
+
+        <button
+          autoFocus
+          onClick={handleActivateTrial}
+          className="btn btn-success animate-tag-pulse"
+          style={{
+            width: "100%",
+            padding: "16px",
+            fontSize: "1.15rem",
+            fontWeight: "900",
+            backgroundColor: "#22c55e",
+            borderColor: "#16a34a",
+            color: "#ffffff",
+            borderRadius: "16px",
+            boxShadow: "0 4px 0 #16a34a",
+            cursor: "pointer",
+            border: "none"
+          }}
+        >
+          🚀 Start My 7-Day Trial!
+        </button>
+
+        <button
+          onClick={() => setShowTrialPopup(false)}
+          className="btn btn-gray"
+          style={{
+            width: "100%",
+            padding: "10px",
+            fontSize: "0.9rem",
+            fontWeight: "800"
+          }}
+        >
+          Maybe Later
+        </button>
+      </KidsModal>
     </div>
   );
 };
