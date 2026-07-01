@@ -22,18 +22,15 @@ export const Onboarding: React.FC = () => {
       setErrorMsg("Please tell us your name! 😊");
       return;
     }
-    if (!age.trim() || isNaN(parseInt(age)) || parseInt(age) <= 0) {
-      setErrorMsg("Please tell us your age! 🎂");
-      return;
-    }
     if (!phone.trim()) {
       setErrorMsg("Please tell us your parent's phone number! 📱");
       return;
     }
     setErrorMsg("");
     setIsLoading(true);
+    const parsedAge = age.trim() ? parseInt(age) : undefined;
     try {
-      await setOnboarding(name.trim(), selectedAvatar, parseInt(age), studentClass.trim(), phone.trim());
+      await setOnboarding(name.trim(), selectedAvatar, parsedAge, studentClass.trim(), phone.trim());
     } catch (err) {
       console.error("Onboarding failed:", err);
       setErrorMsg("Oops! Something went wrong. Try again! 😊");
@@ -108,7 +105,7 @@ export const Onboarding: React.FC = () => {
               htmlFor="student-age-input"
               style={{ fontWeight: "700", color: "var(--text-primary)", fontSize: "1.05rem" }}
             >
-              How old are you? (Age)
+              How old are you? (Optional)
             </label>
             <select
               id="student-age-input"
@@ -174,6 +171,8 @@ export const Onboarding: React.FC = () => {
               <option value="Grade 3">Grade 3 🧠</option>
               <option value="Grade 4">Grade 4 🌌</option>
               <option value="Grade 5">Grade 5 🚀</option>
+              <option value="Grade 6">Grade 6 🪐</option>
+              <option value="Grade 7">Grade 7 🛸</option>
             </select>
           </div>
 

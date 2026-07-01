@@ -123,8 +123,8 @@ export const Dashboard: React.FC = () => {
       const validFriends = friendsDetails.filter((s): s is Student => !!s);
       setFriendsList(validFriends);
 
-      // Fetch logs of friends if current student is paid
-      if (currentStudent.tier === "paid") {
+      // Fetch logs of friends if current student is premium
+      if (isPremium(currentStudent)) {
         const logsMap: Record<string, ActivityLog[]> = {};
         await Promise.all(
           validFriends.map(async (friend) => {
@@ -173,7 +173,7 @@ export const Dashboard: React.FC = () => {
   const handleSendFriendRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentStudent) return;
-    if (currentStudent.tier !== "paid") {
+    if (!isPremium(currentStudent)) {
       setSocialError("Only Premium/Paid users can send friend requests!");
       speakText("Ask your parent to upgrade your account to send friend requests!");
       return;
@@ -355,12 +355,62 @@ export const Dashboard: React.FC = () => {
     }
   };
 
+  const handleVoteGame = async (game: Game, type: "like" | "dislike") => {
+    if (!currentStudent) return;
+    try {
+      const studentId = currentStudent.id;
+      let likes = game.likes || [];
+      let dislikes = game.dislikes || [];
+
+      if (type === "like") {
+        if (likes.includes(studentId)) {
+          likes = likes.filter(id => id !== studentId);
+        } else {
+          likes = [...likes, studentId];
+          dislikes = dislikes.filter(id => id !== studentId);
+        }
+      } else {
+        if (dislikes.includes(studentId)) {
+          dislikes = dislikes.filter(id => id !== studentId);
+        } else {
+          dislikes = [...dislikes, studentId];
+          likes = likes.filter(id => id !== studentId);
+        }
+      }
+
+      const updatedGame: Game = {
+        ...game,
+        likes,
+        dislikes
+      };
+
+      await LocalDB.saveGame(updatedGame);
+      setGames(prev => prev.map(g => g.id === game.id ? updatedGame : g));
+      speakText(type === "like" ? "You liked this activity! 👍" : "You disliked this activity. 👎");
+    } catch (err) {
+      console.error("Failed to cast vote:", err);
+    }
+  };
+
   useEffect(() => {
     // 1. Helper to render games & logs from a given data set
     const renderGamesAndLogs = (allGames: Game[], allLogs: ActivityLog[]) => {
-      const list = allGames.filter(
-        g => !g.assignedStudentId || g.assignedStudentId === currentStudent?.id
-      );
+      const list = allGames.filter(g => {
+        // 1. If assigned to a specific student, verify it matches
+        if (g.assignedStudentId && g.assignedStudentId !== currentStudent?.id) {
+          return false;
+        }
+
+        // 2. Class check: if game has target class(es), student class must match one of them
+        if (g.class && g.class.trim() !== "") {
+          const targetClasses = g.class.split(",").map(c => c.trim().toLowerCase());
+          const studentClassClean = currentStudent?.class?.trim().toLowerCase();
+          return !!studentClassClean && targetClasses.includes(studentClassClean);
+        }
+
+        // 3. No Class game will be visible to all
+        return true;
+      });
 
       // Build completed games lookup map for current student
       const completedMap: Record<string, string> = {};
@@ -1090,27 +1140,79 @@ export const Dashboard: React.FC = () => {
                         );
                       })()}
 
-                      {/* Completed star rewards indicator */}
+                      {/* Completed star rewards indicator & Likes/Dislikes */}
                       {completedGames[game.id] && (
-                        <span
-                          style={{
-                            fontSize: "0.8rem",
-                            backgroundColor: "#d1fae5",
-                            color: "#065f46",
-                            padding: "4px 10px",
-                            borderRadius: "10px",
-                            fontWeight: "800",
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "4px"
-                          }}
-                          title="Replay this activity to earn even more stars!"
-                        >
-                          {viewMode === "list" 
-                            ? `✓ Done (${completedGames[game.id]}) • Replay to earn stars! 🌟`
-                            : `✓ Done (${completedGames[game.id]}) • Replay! 🌟`
-                          }
-                        </span>
+                        <div style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
+                          <span
+                            style={{
+                              fontSize: "0.8rem",
+                              backgroundColor: "#d1fae5",
+                              color: "#065f46",
+                              padding: "4px 10px",
+                              borderRadius: "10px",
+                              fontWeight: "800",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "4px"
+                            }}
+                            title="Replay this activity to earn even more stars!"
+                          >
+                            {viewMode === "list" 
+                              ? `✓ Done (${completedGames[game.id]}) • Replay! 🌟`
+                              : `✓ Done (${completedGames[game.id]}) • Replay! 🌟`
+                            }
+                          </span>
+
+                          {/* Vote buttons */}
+                          <div style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleVoteGame(game, "like");
+                              }}
+                              style={{
+                                border: "none",
+                                background: game.likes?.includes(currentStudent?.id || "") ? "#22c55e" : "#f1f5f9",
+                                color: game.likes?.includes(currentStudent?.id || "") ? "#ffffff" : "#475569",
+                                borderRadius: "8px",
+                                padding: "4px 8px",
+                                fontSize: "0.85rem",
+                                cursor: "pointer",
+                                fontWeight: "800",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "2px",
+                                transition: "all 0.15s ease"
+                              }}
+                              title="Like this game!"
+                            >
+                              👍
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleVoteGame(game, "dislike");
+                              }}
+                              style={{
+                                border: "none",
+                                background: game.dislikes?.includes(currentStudent?.id || "") ? "#ef4444" : "#f1f5f9",
+                                color: game.dislikes?.includes(currentStudent?.id || "") ? "#ffffff" : "#475569",
+                                borderRadius: "8px",
+                                padding: "4px 8px",
+                                fontSize: "0.85rem",
+                                cursor: "pointer",
+                                fontWeight: "800",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "2px",
+                                transition: "all 0.15s ease"
+                              }}
+                              title="Dislike this game"
+                            >
+                              👎
+                            </button>
+                          </div>
+                        </div>
                       )}
 
                       {/* Premium Game badge indicator */}

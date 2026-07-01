@@ -24,7 +24,7 @@ interface AppContextType {
   geminiApiKey: string;
   speakText: (text: string) => void;
   setView: (view: ViewState) => void;
-  setOnboarding: (name: string, avatar: string, age: number, studentClass: string, phone: string) => Promise<void>;
+  setOnboarding: (name: string, avatar: string, age: number | undefined, studentClass: string, phone: string) => Promise<void>;
   setPlayingGame: (game: Game | null) => void;
   updateAccessibility: (config: Partial<AccessibilityConfig>) => void;
   saveApiKey: (key: string) => Promise<void> | void;
@@ -283,7 +283,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const setOnboarding = async (name: string, avatar: string, age: number, studentClass: string, phone: string) => {
+  const setOnboarding = async (name: string, avatar: string, age: number | undefined, studentClass: string, phone: string) => {
     // Collect IP, Device ID, and system metadata
     const details = await getClientDetails();
     

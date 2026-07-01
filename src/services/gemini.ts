@@ -4,7 +4,7 @@ import balloonCountingRaw from "../game/Ballon-counting.html?raw";
 export interface GeneratedGameResponse {
   title: string;
   topic: string;
-  age: number;
+  class?: string;
   difficulty: string;
   htmlContent: string;
   promptUsed: string;
@@ -13,10 +13,10 @@ export interface GeneratedGameResponse {
 }
 
 // Highly creative mock games for different subjects & topics
-const MOCK_TEMPLATES: Record<string, (topic: string, age: number, difficulty: string) => string> = {
-  addition: (_topic, _age, _difficulty) => balloonCountingRaw,
-  subtraction: (_topic, _age, _difficulty) => balloonCountingRaw,
-  shapes: (_topic, _age, _difficulty) => balloonCountingRaw
+const MOCK_TEMPLATES: Record<string, (topic: string, studentClass: string, difficulty: string) => string> = {
+  addition: (_topic, _class, _difficulty) => balloonCountingRaw,
+  subtraction: (_topic, _class, _difficulty) => balloonCountingRaw,
+  shapes: (_topic, _class, _difficulty) => balloonCountingRaw
 };
 
 function extractJson(str: string): string | null {
@@ -63,7 +63,7 @@ function extractJson(str: string): string | null {
 export async function generateGame(
   subject: string,
   topic: string,
-  age: number,
+  studentClass: string,
   difficulty: "Easy" | "Medium" | "Hard",
   apiKey?: string,
   customInstruction?: string,
@@ -71,7 +71,7 @@ export async function generateGame(
   originalHtml?: string,
   dyslexiaTypography: boolean = false
 ): Promise<GeneratedGameResponse> {
-  let prompt = `Generate a single-file interactive educational HTML game for a child aged ${age} facing dyslexia.
+  let prompt = `Generate a single-file interactive educational HTML game for a child in ${studentClass} facing dyslexia.
 Subject: ${subject}
 Topic: ${topic}
 Difficulty: ${difficulty}
@@ -188,7 +188,7 @@ ${originalHtml.trim()}
       return {
         title,
         topic,
-        age,
+        class: studentClass,
         difficulty,
         htmlContent,
         promptUsed: prompt,
@@ -211,7 +211,7 @@ ${originalHtml.trim()}
       : "addition";
 
   const generator = MOCK_TEMPLATES[key] || MOCK_TEMPLATES.addition;
-  const htmlContent = generator(topic, age, difficulty);
+  const htmlContent = generator(topic, studentClass, difficulty);
   const validation = validateGameCode(htmlContent);
 
   const titleEmoji = key === "subtraction" ? "💫" : key === "shapes" ? "🔍" : "🧮";
@@ -220,7 +220,7 @@ ${originalHtml.trim()}
   return {
     title: formattedTitle,
     topic,
-    age,
+    class: studentClass,
     difficulty,
     htmlContent,
     promptUsed: prompt,

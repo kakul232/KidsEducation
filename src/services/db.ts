@@ -92,7 +92,8 @@ export interface Game {
   title: string;
   topic: string;
   subject: string;
-  age: number;
+  age?: number;
+  class?: string;
   difficulty: "Easy" | "Medium" | "Hard";
   htmlContent: string;
   published: boolean;
@@ -101,6 +102,8 @@ export interface Game {
   isFree?: boolean;
   order?: number;
   starsRequired?: number;
+  likes?: string[];
+  dislikes?: string[];
 }
 
 // Initial default games to populate if none exist

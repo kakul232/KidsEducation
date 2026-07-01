@@ -1,9 +1,10 @@
 import React, { useState } from "react";
 import { useApp } from "../context/AppContext";
 import { Volume2, VolumeX, Eye, Type, ZoomIn, Settings, X } from "lucide-react";
+import { AVATARS } from "../utils/constants";
 
 export const AccessibilityControls: React.FC = () => {
-  const { accessibility, updateAccessibility, speakText } = useApp();
+  const { accessibility, updateAccessibility, speakText, currentStudent, updateStudent } = useApp();
   const [isOpen, setIsOpen] = useState(false);
 
   const toggleOpen = () => {
@@ -173,6 +174,142 @@ export const AccessibilityControls: React.FC = () => {
             {accessibility.voiceAssistance ? <Volume2 size={20} /> : <VolumeX size={20} />}
             <span style={{ fontSize: "0.95rem" }}>Voice Guidance</span>
           </button>
+
+          {/* Profile Settings Section */}
+          {currentStudent && (
+            <>
+              <hr style={{ border: 0, borderTop: "2px solid #cbd5e1" }} />
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px", textAlign: "left" }}>
+                <h4 style={{ margin: "0 0 4px 0", fontSize: "1rem", color: "var(--text-primary)", fontWeight: "800" }}>
+                  👤 Edit My Profile
+                </h4>
+                
+                <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                  <label htmlFor="edit-profile-name" style={{ fontSize: "0.75rem", fontWeight: "700", color: "var(--text-secondary)" }}>Name</label>
+                  <input
+                    id="edit-profile-name"
+                    type="text"
+                    placeholder="My Name"
+                    defaultValue={currentStudent.name}
+                    onBlur={async (e) => {
+                      const val = e.target.value.trim();
+                      if (val && val !== currentStudent.name) {
+                        await updateStudent({ ...currentStudent, name: val });
+                        speakText(`Name updated to ${val}`);
+                      }
+                    }}
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: "10px",
+                      border: "2px solid #cbd5e1",
+                      fontSize: "0.85rem",
+                      width: "100%",
+                      backgroundColor: "var(--bg-primary)",
+                      color: "var(--text-primary)"
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                  <label htmlFor="edit-profile-age" style={{ fontSize: "0.75rem", fontWeight: "700", color: "var(--text-secondary)" }}>Age (Optional)</label>
+                  <select
+                    id="edit-profile-age"
+                    value={currentStudent.age || ""}
+                    onChange={async (e) => {
+                      const val = e.target.value;
+                      const parsed = val ? parseInt(val) : undefined;
+                      await updateStudent({ ...currentStudent, age: parsed });
+                      speakText(`Age updated to ${val || "none"}`);
+                    }}
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: "10px",
+                      border: "2px solid #cbd5e1",
+                      fontSize: "0.85rem",
+                      width: "100%",
+                      backgroundColor: "var(--bg-primary)",
+                      color: "var(--text-primary)",
+                      cursor: "pointer"
+                    }}
+                  >
+                    <option value="">Select age (Optional)... 🎂</option>
+                    <option value="3">3 Years Old</option>
+                    <option value="4">4 Years Old</option>
+                    <option value="5">5 Years Old</option>
+                    <option value="6">6 Years Old</option>
+                    <option value="7">7 Years Old</option>
+                    <option value="8">8 Years Old</option>
+                    <option value="9">9 Years Old</option>
+                    <option value="10">10 Years Old</option>
+                    <option value="11">11 Years Old</option>
+                    <option value="12">12 Years Old</option>
+                  </select>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                  <label htmlFor="edit-profile-class" style={{ fontSize: "0.75rem", fontWeight: "700", color: "var(--text-secondary)" }}>Class</label>
+                  <select
+                    id="edit-profile-class"
+                    value={currentStudent.class || ""}
+                    onChange={async (e) => {
+                      const val = e.target.value;
+                      await updateStudent({ ...currentStudent, class: val });
+                      speakText(`Class updated to ${val || "none"}`);
+                    }}
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: "10px",
+                      border: "2px solid #cbd5e1",
+                      fontSize: "0.85rem",
+                      width: "100%",
+                      backgroundColor: "var(--bg-primary)",
+                      color: "var(--text-primary)",
+                      cursor: "pointer"
+                    }}
+                  >
+                    <option value="">Select class... 🏫</option>
+                    <option value="Preschool">Preschool</option>
+                    <option value="Kindergarten">Kindergarten</option>
+                    <option value="Grade 1">Grade 1</option>
+                    <option value="Grade 2">Grade 2</option>
+                    <option value="Grade 3">Grade 3</option>
+                    <option value="Grade 4">Grade 4</option>
+                    <option value="Grade 5">Grade 5</option>
+                    <option value="Grade 6">Grade 6</option>
+                    <option value="Grade 7">Grade 7</option>
+                  </select>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                  <span style={{ fontSize: "0.75rem", fontWeight: "700", color: "var(--text-secondary)" }}>Avatar</span>
+                  <div style={{ display: "flex", gap: "6px", overflowX: "auto", paddingBottom: "4px", width: "100%" }}>
+                    {AVATARS.map(av => (
+                      <button
+                        key={av.id}
+                        type="button"
+                        onClick={async () => {
+                          await updateStudent({ ...currentStudent, avatar: av.id });
+                          speakText(`Avatar changed to ${av.label}`);
+                        }}
+                        style={{
+                          padding: "6px",
+                          borderRadius: "10px",
+                          border: currentStudent.avatar === av.id ? "2.5px solid var(--accent-primary)" : "1.5px dashed #cbd5e1",
+                          backgroundColor: currentStudent.avatar === av.id ? av.color : "transparent",
+                          fontSize: "1.3rem",
+                          cursor: "pointer",
+                          flexShrink: 0
+                        }}
+                        title={av.label}
+                      >
+                        {av.label.split(" ")[0]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       )}
     </>

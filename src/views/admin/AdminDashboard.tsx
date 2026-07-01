@@ -75,7 +75,7 @@ export const AdminDashboard: React.FC = () => {
   // AI Studio Generation Form States
   const [subject] = useState("Mathematics");
   const [topic, setTopic] = useState("Addition");
-  const [age, setAge] = useState(5);
+  const [selectedClasses, setSelectedClasses] = useState<string[]>(["Grade 1"]);
   const [difficulty, setDifficulty] = useState<"Easy" | "Medium" | "Hard">("Easy");
   const [assignedStudentId, setAssignedStudentId] = useState("");
   const [gameInstruction, setGameInstruction] = useState("Use space travel theme, include colorful floating planets, count visual stars, astronaut guidance.");
@@ -413,7 +413,7 @@ export const AdminDashboard: React.FC = () => {
     ].filter(Boolean).join("\n• ");
 
     try {
-      const result = await generateGame(subject, topic, age, difficulty, geminiApiKey, combinedInstructions, rounds, undefined, dyslexiaTypography);
+      const result = await generateGame(subject, topic, selectedClasses.join(", "), difficulty, geminiApiKey, combinedInstructions, rounds, undefined, dyslexiaTypography);
       setGeneratedGame(result);
       setDraftCode(result.htmlContent);
     } catch (err: any) {
@@ -450,7 +450,7 @@ export const AdminDashboard: React.FC = () => {
     ].filter(Boolean).join("\n• ");
 
     try {
-      const result = await generateGame(subject, topic, age, difficulty, geminiApiKey, modifyInstructions, rounds, draftCode, dyslexiaTypography);
+      const result = await generateGame(subject, topic, selectedClasses.join(", "), difficulty, geminiApiKey, modifyInstructions, rounds, draftCode, dyslexiaTypography);
       setGeneratedGame(result);
       setDraftCode(result.htmlContent);
       setTweakInstruction("");
@@ -470,7 +470,7 @@ export const AdminDashboard: React.FC = () => {
       title: generatedGame.title,
       topic: generatedGame.topic,
       subject: "Mathematics",
-      age: generatedGame.age,
+      class: generatedGame.class || selectedClasses.join(", "),
       difficulty: generatedGame.difficulty as any,
       htmlContent: draftCode, // Save current draft code (which includes any admin edits!)
       published: true,
@@ -510,7 +510,7 @@ export const AdminDashboard: React.FC = () => {
       title: generatedGame.title,
       topic: generatedGame.topic,
       subject: "Mathematics",
-      age: generatedGame.age,
+      class: generatedGame.class || selectedClasses.join(", "),
       difficulty: generatedGame.difficulty as any,
       htmlContent: draftCode,
       published: false, // Save as Draft
@@ -533,14 +533,18 @@ export const AdminDashboard: React.FC = () => {
 
   const handleEditGame = (game: Game) => {
     setTopic(game.topic);
-    setAge(game.age);
+    if (game.class) {
+      setSelectedClasses(game.class.split(",").map(c => c.trim()));
+    } else {
+      setSelectedClasses(["Grade 1"]);
+    }
     setDifficulty(game.difficulty);
     setAssignedStudentId(game.assignedStudentId || "");
     setDraftCode(game.htmlContent);
     setGeneratedGame({
       title: game.title,
       topic: game.topic,
-      age: game.age,
+      class: game.class || "Grade 1",
       difficulty: game.difficulty,
       htmlContent: game.htmlContent,
       promptUsed: "",
@@ -559,7 +563,7 @@ export const AdminDashboard: React.FC = () => {
     setDraftCode("");
     setCodeEditMode(false);
     setTopic("Addition");
-    setAge(5);
+    setSelectedClasses(["Grade 1"]);
     setDifficulty("Easy");
     setAssignedStudentId("");
     setGameInstruction("");
@@ -1041,19 +1045,27 @@ export const AdminDashboard: React.FC = () => {
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                <label htmlFor="age-selector-studio" style={{ fontWeight: "700", fontSize: "0.9rem" }}>Student Age</label>
-                <select
-                  id="age-selector-studio"
-                  value={age}
-                  onChange={e => setAge(Number(e.target.value))}
-                  style={{ padding: "12px", borderRadius: "10px", border: "2px solid #cbd5e1" }}
-                >
-                  <option value={5}>Age 5</option>
-                  <option value={6}>Age 6</option>
-                  <option value={7}>Age 7</option>
-                  <option value={8}>Age 8</option>
-                </select>
-              </div>
+                 <label style={{ fontWeight: "700", fontSize: "0.9rem" }}>Target Classes / Grades</label>
+                 <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", marginTop: "4px", backgroundColor: "#fff", padding: "10px", borderRadius: "10px", border: "2px solid #cbd5e1" }}>
+                   {["Preschool", "Kindergarten", "Grade 1", "Grade 2", "Grade 3", "Grade 4", "Grade 5", "Grade 6", "Grade 7"].map(cls => (
+                     <label key={cls} style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "0.85rem", fontWeight: "600", cursor: "pointer" }}>
+                       <input
+                         type="checkbox"
+                         checked={selectedClasses.includes(cls)}
+                         onChange={(e) => {
+                           if (e.target.checked) {
+                             setSelectedClasses(prev => [...prev, cls]);
+                           } else {
+                             setSelectedClasses(prev => prev.filter(c => c !== cls));
+                           }
+                         }}
+                         style={{ width: "16px", height: "16px" }}
+                       />
+                       {cls}
+                     </label>
+                   ))}
+                 </div>
+               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                 <label htmlFor="difficulty-selector-studio" style={{ fontWeight: "700", fontSize: "0.9rem" }}>Difficulty</label>
@@ -1652,9 +1664,13 @@ export const AdminDashboard: React.FC = () => {
                       <div style={{ display: "flex", gap: "8px", marginTop: "4px", fontSize: "0.75rem", color: "var(--text-secondary)", flexWrap: "wrap", alignItems: "center" }}>
                         <span>Topic: {game.topic}</span>
                         <span>•</span>
-                        <span>Age: {game.age}</span>
+                        <span>Class: {game.class || "All"}</span>
                         <span>•</span>
                         <span style={{ fontWeight: "700" }}>{game.difficulty}</span>
+                        <span>•</span>
+                        <span style={{ color: "#16a34a", fontWeight: "700" }}>👍 {game.likes?.length || 0}</span>
+                        <span>•</span>
+                        <span style={{ color: "#dc2626", fontWeight: "700" }}>👎 {game.dislikes?.length || 0}</span>
                         <span>•</span>
                         <div style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
                           <span>Sort Order:</span>
