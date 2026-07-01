@@ -36,6 +36,7 @@ export const Dashboard: React.FC = () => {
   const [isLoading, setIsLoading] = useState(LocalDB.getCachedGames().length === 0);
   const [viewMode, setViewMode] = useState<"list" | "grid">("grid");
   const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const [visibleGameCount, setVisibleGameCount] = useState(10);
 
   // Modals & game requests states
   const [showRequestModal, setShowRequestModal] = useState(false);
@@ -58,10 +59,26 @@ export const Dashboard: React.FC = () => {
       const completedMap: Record<string, string> = {};
       if (currentStudent) {
         const studentLogs = allLogs.filter(l => l.studentId === currentStudent.id);
+        const gameStars: Record<string, number> = {};
         studentLogs.forEach(log => {
           if (log.completionRate === 100) {
-            completedMap[log.gameId] = log.rewardEarned || "⭐ Completed";
+            let stars = 0;
+            if (log.rewardEarned) {
+              const match = log.rewardEarned.match(/(\d+)/);
+              if (match) {
+                stars = parseInt(match[1], 10);
+              } else if (log.rewardEarned.includes("Star")) {
+                stars = 1;
+              }
+            } else {
+              stars = 5; // Default completion reward fallback
+            }
+            gameStars[log.gameId] = (gameStars[log.gameId] || 0) + stars;
           }
+        });
+        
+        Object.keys(gameStars).forEach(gameId => {
+          completedMap[gameId] = `⭐ ${gameStars[gameId]} Stars`;
         });
         setCompletedGames(completedMap);
       }
@@ -152,6 +169,21 @@ export const Dashboard: React.FC = () => {
 
     fetchFreshData();
   }, [currentStudent]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      // Check if user scrolled near the bottom of the window
+      if (
+        window.innerHeight + document.documentElement.scrollTop >=
+        document.documentElement.offsetHeight - 150
+      ) {
+        setVisibleGameCount(prev => prev + 10);
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   const handleStudentLogOut = () => {
     localStorage.removeItem("active_student_id");
@@ -264,9 +296,12 @@ export const Dashboard: React.FC = () => {
     );
   }
 
+  if (isLoading) {
+    return <KidsLoader />;
+  }
+
   return (
     <div className="container animate-slide-up">
-      {isLoading && <KidsLoader />}
       {/* Student Profile Header using Reusable PlayCard, AvatarIcon, StarBadge and StreakBadge */}
       <PlayCard
         style={{
@@ -481,7 +516,7 @@ export const Dashboard: React.FC = () => {
                 : { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "16px" }
             }
           >
-            {games.map(game => {
+            {games.slice(0, visibleGameCount).map(game => {
               const { emoji, cleanTitle } = parseGameTitle(game.title);
               const isPremiumLocked = game.isFree === false && currentStudent?.tier !== "paid";
               const isStarLocked = game.starsRequired ? (currentStudent?.stars || 0) < game.starsRequired : false;

@@ -24,6 +24,12 @@ const BUBBLES = Array.from({ length: 12 }, (_, i) => ({
 export const KidsLoader: React.FC = () => {
   const [messageIndex, setMessageIndex] = useState(0);
   const [animateText, setAnimateText] = useState(true);
+  const loaderRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // Focus the loader immediately on mount for screen readers and accessibility
+    loaderRef.current?.focus();
+  }, []);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -39,6 +45,11 @@ export const KidsLoader: React.FC = () => {
 
   return (
     <div
+      ref={loaderRef}
+      tabIndex={-1}
+      role="dialog"
+      aria-busy="true"
+      aria-label="Loading content, please wait"
       style={{
         position: "fixed",
         top: 0,
@@ -52,7 +63,8 @@ export const KidsLoader: React.FC = () => {
         alignItems: "center",
         justifyContent: "center",
         zIndex: 99999,
-        overflow: "hidden"
+        overflow: "hidden",
+        outline: "none"
       }}
     >
       {/* Floating balloons/bubbles in the background */}
