@@ -18,6 +18,8 @@ export interface Student {
   phone?: string;
   validUntil?: string;
   tier?: "free" | "paid";
+  createdAt?: string;
+  trialUntil?: string;
 }
 
 export interface AttemptDetail {

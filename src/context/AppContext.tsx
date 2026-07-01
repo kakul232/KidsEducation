@@ -194,6 +194,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, []);
 
+  // Listen to real-time changes on the current student document (e.g. tier toggled by Admin)
+  useEffect(() => {
+    if (!currentStudent?.id) return;
+    
+    const unsubscribe = onSnapshot(doc(db, "students", currentStudent.id), (docSnap) => {
+      if (docSnap.exists()) {
+        const updatedStudent = docSnap.data() as Student;
+        setCurrentStudent(prev => {
+          if (!prev || 
+              prev.tier !== updatedStudent.tier || 
+              prev.stars !== updatedStudent.stars || 
+              prev.streak !== updatedStudent.streak ||
+              prev.name !== updatedStudent.name ||
+              prev.avatar !== updatedStudent.avatar
+          ) {
+            return updatedStudent;
+          }
+          return prev;
+        });
+      }
+    });
+
+    return () => unsubscribe();
+  }, [currentStudent?.id]);
+
   // Listen to Firebase Auth state changes
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(firebaseAuth, async (user) => {
@@ -278,6 +303,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     const validUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    const trialUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    const createdAt = new Date().toISOString();
 
     if (matchedStudent) {
       console.log("Matching student profile found! Logging into existing account:", matchedStudent);
@@ -290,7 +317,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ip: details.ip || matchedStudent.ip || "",
         userAgent: details.userAgent,
         browser: details.browser,
-        deviceType: details.deviceType
+        deviceType: details.deviceType,
+        createdAt: matchedStudent.createdAt || createdAt,
+        trialUntil: matchedStudent.trialUntil || trialUntil
       };
 
       await LocalDB.saveStudent(updatedStudent);
@@ -315,7 +344,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         age,
         class: studentClass,
         phone,
-        validUntil
+        validUntil,
+        createdAt,
+        trialUntil
       };
 
       await LocalDB.saveStudent(newStudent);

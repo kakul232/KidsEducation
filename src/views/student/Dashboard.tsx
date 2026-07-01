@@ -28,6 +28,13 @@ const parseGameTitle = (fullTitle: string) => {
   return { emoji: "🎮", cleanTitle: trimmed };
 };
 
+const isPremium = (student: Student | null) => {
+  if (!student) return false;
+  if (student.tier === "paid") return true;
+  if (student.trialUntil && new Date() < new Date(student.trialUntil)) return true;
+  return false;
+};
+
 export const Dashboard: React.FC = () => {
   const { currentStudent, updateStudent, setPlayingGame, installPrompt, triggerInstall, notiPermission, requestNotiPermission, speakText } = useApp();
   const [games, setGames] = useState<Game[]>([]);
@@ -59,6 +66,7 @@ export const Dashboard: React.FC = () => {
   const [socialError, setSocialError] = useState("");
   const [socialSuccess, setSocialSuccess] = useState("");
   const [isUpgrading, setIsUpgrading] = useState(false);
+  const [showFrogModal, setShowFrogModal] = useState(false);
 
   // Challenge & Flexing States
   const [challenges, setChallenges] = useState<Challenge[]>([]);
@@ -130,24 +138,9 @@ export const Dashboard: React.FC = () => {
     }
   }, [currentStudent]);
 
-  const handleUpgradeToPremium = async () => {
-    if (!currentStudent) return;
-    setIsUpgrading(true);
-    try {
-      const updated: Student = {
-        ...currentStudent,
-        tier: "paid"
-      };
-      await updateStudent(updated);
-      speakText("Hooray! You are now a premium learner! Let's connect with your friends!");
-      setSocialSuccess("Successfully upgraded to Premium! 💎");
-      setTimeout(() => setSocialSuccess(""), 4000);
-    } catch (err) {
-      console.error("Failed to upgrade student:", err);
-      setSocialError("Failed to simulate upgrade. Try again!");
-    } finally {
-      setIsUpgrading(false);
-    }
+  const handleUpgradeToPremium = () => {
+    speakText("Ribbit! Ask your parents to call Frog Uncle at +91 9871229599 to unlock premium features!");
+    setShowFrogModal(true);
   };
 
   const handleSendFriendRequest = async (e: React.FormEvent) => {
@@ -613,7 +606,25 @@ export const Dashboard: React.FC = () => {
             <h2 style={{ fontSize: "1.2rem", margin: 0 }}>
               Hi, {currentStudent?.name || "Student"}!
             </h2>
-            <span style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>Student Account</span>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "2px" }}>
+              <span style={{ fontSize: "0.8rem", color: "var(--text-secondary)", fontWeight: "600" }}>Student Account</span>
+              <span
+                style={{
+                  fontSize: "0.75rem",
+                  backgroundColor: isPremium(currentStudent) ? "#e0f2fe" : "#f1f5f9",
+                  color: isPremium(currentStudent) ? "#0369a1" : "#475569",
+                  padding: "2px 8px",
+                  borderRadius: "8px",
+                  fontWeight: "900",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "2px",
+                  border: isPremium(currentStudent) ? "1.5px solid #bae6fd" : "1.5px solid #cbd5e1"
+                }}
+              >
+                {isPremium(currentStudent) ? "💎 Premium" : "🆓 Free"}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -878,7 +889,7 @@ export const Dashboard: React.FC = () => {
           >
             {games.slice(0, visibleGameCount).map(game => {
               const { emoji, cleanTitle } = parseGameTitle(game.title);
-              const isPremiumLocked = game.isFree === false && currentStudent?.tier !== "paid";
+              const isPremiumLocked = game.isFree === false && !isPremium(currentStudent);
               const isStarLocked = game.starsRequired ? (currentStudent?.stars || 0) < game.starsRequired : false;
               const isGameLocked = isPremiumLocked || isStarLocked;
               return (
@@ -1215,23 +1226,25 @@ export const Dashboard: React.FC = () => {
             style={{
               padding: "20px",
               backgroundColor: "var(--bg-secondary)",
-              borderColor: currentStudent?.tier === "paid" ? "#cbd5e1" : "#fca5a5",
+              borderColor: isPremium(currentStudent) ? "#cbd5e1" : "#fca5a5",
               borderWidth: "3px",
-              borderStyle: currentStudent?.tier === "paid" ? "solid" : "dashed",
+              borderStyle: isPremium(currentStudent) ? "solid" : "dashed",
               borderRadius: "20px",
               boxShadow: "0 6px 0 rgba(0,0,0,0.03)"
             }}
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                <span style={{ fontSize: "2.5rem" }}>{currentStudent?.tier === "paid" ? "💎" : "🆓"}</span>
+                <span style={{ fontSize: "2.5rem" }}>{isPremium(currentStudent) ? "💎" : "🆓"}</span>
                 <div style={{ textAlign: "left" }}>
                   <h4 style={{ margin: 0, fontSize: "1.15rem", fontWeight: "900", color: "var(--text-primary)" }}>
-                    Account Tier: {currentStudent?.tier === "paid" ? "Premium Learner" : "Free Learner"}
+                    Account Tier: {currentStudent?.tier === "paid" ? "Premium Learner" : (isPremium(currentStudent) ? "Premium Trial" : "Free Learner")}
                   </h4>
                   <p style={{ margin: "4px 0 0 0", fontSize: "0.85rem", color: "var(--text-secondary)", fontWeight: "600" }}>
-                    {currentStudent?.tier === "paid"
-                      ? "You have full access to send requests & view friends' game scores! 🚀"
+                    {isPremium(currentStudent)
+                      ? (currentStudent?.tier === "paid"
+                          ? "You have full access to send requests & view friends' game scores! 🚀"
+                          : "Premium Trial active! Call Frog Uncle to extend! 🐸")
                       : "Upgrade to premium to send requests & see friends' highscores! ✨"}
                   </p>
                 </div>
@@ -1273,7 +1286,7 @@ export const Dashboard: React.FC = () => {
                 value={friendPhone}
                 onChange={(e) => setFriendPhone(e.target.value)}
                 placeholder="Enter parent's phone number (e.g. 1234567890)"
-                disabled={currentStudent?.tier !== "paid" || isSearchingFriend}
+                disabled={!isPremium(currentStudent) || isSearchingFriend}
                 style={{
                   flex: 1,
                   minWidth: "200px",
@@ -1282,13 +1295,13 @@ export const Dashboard: React.FC = () => {
                   borderRadius: "12px",
                   border: "3.5px solid #cbd5e1",
                   fontWeight: "600",
-                  backgroundColor: currentStudent?.tier === "paid" ? "var(--bg-primary)" : "#f1f5f9",
+                  backgroundColor: isPremium(currentStudent) ? "var(--bg-primary)" : "#f1f5f9",
                   color: "var(--text-primary)"
                 }}
               />
               <button
                 type="submit"
-                disabled={currentStudent?.tier !== "paid" || isSearchingFriend || !friendPhone.trim()}
+                disabled={!isPremium(currentStudent) || isSearchingFriend || !friendPhone.trim()}
                 className="btn btn-primary"
                 style={{
                   padding: "12px 24px",
@@ -1297,13 +1310,13 @@ export const Dashboard: React.FC = () => {
                   borderRadius: "12px",
                   boxShadow: "0 4px 0 var(--accent-secondary)",
                   border: "none",
-                  cursor: (currentStudent?.tier !== "paid" || isSearchingFriend || !friendPhone.trim()) ? "not-allowed" : "pointer"
+                  cursor: (!isPremium(currentStudent) || isSearchingFriend || !friendPhone.trim()) ? "not-allowed" : "pointer"
                 }}
               >
                 {isSearchingFriend ? "Searching..." : "Send Request 🚀"}
               </button>
             </form>
-            {currentStudent?.tier !== "paid" && (
+            {!isPremium(currentStudent) && (
               <p style={{ margin: "8px 0 0 0", fontSize: "0.8rem", color: "#ef4444", fontWeight: "700" }}>
                 🔒 Upgrading to Premium is required to invite friends by phone number.
               </p>
@@ -1623,7 +1636,7 @@ export const Dashboard: React.FC = () => {
           )}
 
           {/* My Own Highscores (For flexing) */}
-          {currentStudent?.tier === "paid" && myHighscores.length > 0 && (
+          {isPremium(currentStudent) && myHighscores.length > 0 && (
             <PlayCard style={{ padding: "20px", borderRadius: "20px" }}>
               <h4 style={{ margin: "0 0 16px 0", fontSize: "1.1rem", fontWeight: "900", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "8px" }}>
                 <span>🏆 My Highscores (Brag & Flex)</span>
@@ -1748,7 +1761,7 @@ export const Dashboard: React.FC = () => {
                         </div>
 
                         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                          {currentStudent?.tier === "paid" && (
+                          {isPremium(currentStudent) && (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -1815,7 +1828,7 @@ export const Dashboard: React.FC = () => {
                             )}
                           </div>
 
-                          {currentStudent?.tier !== "paid" ? (
+                          {!isPremium(currentStudent) ? (
                             /* Premium Locked Highscores for Free Users */
                             <div
                               style={{
@@ -2353,6 +2366,93 @@ export const Dashboard: React.FC = () => {
             >
               Cancel
             </button>
+          </PlayCard>
+        </div>
+      )}
+
+      {/* 6. Frog Uncle Premium Upgrade Modal */}
+      {showFrogModal && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(15, 23, 42, 0.4)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 10005,
+            padding: "20px",
+            backdropFilter: "blur(5px)"
+          }}
+        >
+          <PlayCard
+            style={{
+              maxWidth: "380px",
+              width: "100%",
+              padding: "28px 24px",
+              backgroundColor: "#f0fdf4",
+              border: "4px solid #22c55e",
+              borderRadius: "24px",
+              textAlign: "center",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "16px",
+              boxShadow: "0 12px 24px rgba(34, 197, 94, 0.15)"
+            }}
+          >
+            <div style={{ fontSize: "4.5rem", animation: "kids-wiggle 2s infinite ease-in-out" }}>🐸</div>
+            
+            <h3 style={{ margin: 0, fontSize: "1.6rem", fontWeight: "900", color: "#166534" }}>
+              Frog Uncle's Magic! ✨
+            </h3>
+            
+            <p style={{ color: "#1b6535", fontSize: "1.05rem", fontWeight: "700", margin: 0, lineHeight: "1.5" }}>
+              Want to unlock Premium and play games with your friends? <br />
+              Ask your parent to call <strong>Frog Uncle</strong>! 📞
+            </p>
+
+            <a
+              href="tel:+919871229599"
+              className="btn btn-success"
+              style={{
+                width: "100%",
+                padding: "14px",
+                fontSize: "1.1rem",
+                fontWeight: "900",
+                backgroundColor: "#22c55e",
+                borderColor: "#16a34a",
+                color: "#ffffff",
+                borderRadius: "16px",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "8px",
+                boxShadow: "0 4px 0 #16a34a",
+                textDecoration: "none",
+                cursor: "pointer"
+              }}
+            >
+              <span>📞 Call Frog Uncle</span>
+            </a>
+
+            <div style={{ display: "flex", gap: "10px", width: "100%", marginTop: "8px" }}>
+              <button
+                onClick={() => setShowFrogModal(false)}
+                className="btn btn-gray"
+                style={{
+                  width: "100%",
+                  padding: "12px",
+                  fontSize: "0.95rem",
+                  fontWeight: "800"
+                }}
+              >
+                Not Now
+              </button>
+            </div>
           </PlayCard>
         </div>
       )}
