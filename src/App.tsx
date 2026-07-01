@@ -38,7 +38,7 @@ const MainAppContent: React.FC = () => {
       </main>
 
       {/* Floating Accessibility settings for Dyslexic accessibility */}
-      <AccessibilityControls />
+      {currentView !== "game_player" && <AccessibilityControls />}
     </>
   );
 };
