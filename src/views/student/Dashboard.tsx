@@ -65,7 +65,6 @@ export const Dashboard: React.FC = () => {
   const [isSearchingFriend, setIsSearchingFriend] = useState(false);
   const [socialError, setSocialError] = useState("");
   const [socialSuccess, setSocialSuccess] = useState("");
-  const [isUpgrading, setIsUpgrading] = useState(false);
   const [showFrogModal, setShowFrogModal] = useState(false);
 
   // Challenge & Flexing States
@@ -1281,7 +1280,6 @@ export const Dashboard: React.FC = () => {
               {currentStudent?.tier !== "paid" && (
                 <button
                   onClick={handleUpgradeToPremium}
-                  disabled={isUpgrading}
                   className="btn btn-success animate-tag-pulse"
                   style={{
                     padding: "10px 18px",
