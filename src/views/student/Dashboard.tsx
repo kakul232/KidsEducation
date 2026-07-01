@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useApp } from "../../context/AppContext";
 import LocalDB from "../../services/db";
 import type { Game, ActivityLog, FriendRequest, Student, Challenge } from "../../services/db";
-import { Trophy, Play, Lock, Send } from "lucide-react";
+import { Trophy, Play, Lock, Send, RotateCcw } from "lucide-react";
 import { SUBJECTS } from "../../utils/constants";
 import { AvatarIcon } from "../../components/AvatarIcon";
 import { StarBadge } from "../../components/StarBadge";
@@ -355,42 +355,7 @@ export const Dashboard: React.FC = () => {
     }
   };
 
-  const handleVoteGame = async (game: Game, type: "like" | "dislike") => {
-    if (!currentStudent) return;
-    try {
-      const studentId = currentStudent.id;
-      let likes = game.likes || [];
-      let dislikes = game.dislikes || [];
 
-      if (type === "like") {
-        if (likes.includes(studentId)) {
-          likes = likes.filter(id => id !== studentId);
-        } else {
-          likes = [...likes, studentId];
-          dislikes = dislikes.filter(id => id !== studentId);
-        }
-      } else {
-        if (dislikes.includes(studentId)) {
-          dislikes = dislikes.filter(id => id !== studentId);
-        } else {
-          dislikes = [...dislikes, studentId];
-          likes = likes.filter(id => id !== studentId);
-        }
-      }
-
-      const updatedGame: Game = {
-        ...game,
-        likes,
-        dislikes
-      };
-
-      await LocalDB.saveGame(updatedGame);
-      setGames(prev => prev.map(g => g.id === game.id ? updatedGame : g));
-      speakText(type === "like" ? "You liked this activity! 👍" : "You disliked this activity. 👎");
-    } catch (err) {
-      console.error("Failed to cast vote:", err);
-    }
-  };
 
   useEffect(() => {
     // 1. Helper to render games & logs from a given data set
@@ -1134,79 +1099,25 @@ export const Dashboard: React.FC = () => {
                         );
                       })()}
 
-                      {/* Completed star rewards indicator & Likes/Dislikes */}
+                      {/* Completed star rewards indicator */}
                       {completedGames[game.id] && (
-                        <div style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
-                          <span
-                            style={{
-                              fontSize: "0.8rem",
-                              backgroundColor: "#d1fae5",
-                              color: "#065f46",
-                              padding: "4px 10px",
-                              borderRadius: "10px",
-                              fontWeight: "800",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: "4px"
-                            }}
-                            title="Replay this activity to earn even more stars!"
-                          >
-                            {viewMode === "list" 
-                              ? `✓ Done (${completedGames[game.id]}) • Replay! 🌟`
-                              : `✓ Done (${completedGames[game.id]}) • Replay! 🌟`
-                            }
-                          </span>
-
-                          {/* Vote buttons */}
-                          <div style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleVoteGame(game, "like");
-                              }}
-                              style={{
-                                border: "none",
-                                background: game.likes?.includes(currentStudent?.id || "") ? "#22c55e" : "#f1f5f9",
-                                color: game.likes?.includes(currentStudent?.id || "") ? "#ffffff" : "#475569",
-                                borderRadius: "8px",
-                                padding: "4px 8px",
-                                fontSize: "0.85rem",
-                                cursor: "pointer",
-                                fontWeight: "800",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "2px",
-                                transition: "all 0.15s ease"
-                              }}
-                              title="Like this game!"
-                            >
-                              👍
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleVoteGame(game, "dislike");
-                              }}
-                              style={{
-                                border: "none",
-                                background: game.dislikes?.includes(currentStudent?.id || "") ? "#ef4444" : "#f1f5f9",
-                                color: game.dislikes?.includes(currentStudent?.id || "") ? "#ffffff" : "#475569",
-                                borderRadius: "8px",
-                                padding: "4px 8px",
-                                fontSize: "0.85rem",
-                                cursor: "pointer",
-                                fontWeight: "800",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "2px",
-                                transition: "all 0.15s ease"
-                              }}
-                              title="Dislike this game"
-                            >
-                              👎
-                            </button>
-                          </div>
-                        </div>
+                        <span
+                          style={{
+                            fontSize: "0.75rem",
+                            backgroundColor: "#d1fae5",
+                            color: "#065f46",
+                            padding: "4px 8px",
+                            borderRadius: "10px",
+                            fontWeight: "800",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "4px",
+                            whiteSpace: "nowrap"
+                          }}
+                          title="Replay this activity to earn even more stars!"
+                        >
+                          ✓ Done ({completedGames[game.id]})
+                        </span>
                       )}
 
                       {/* Premium Game badge indicator */}
@@ -1240,7 +1151,7 @@ export const Dashboard: React.FC = () => {
                   >
                     <div
                       style={{
-                        backgroundColor: isGameLocked ? "#cbd5e1" : "var(--accent-primary)",
+                        backgroundColor: isGameLocked ? "#cbd5e1" : completedGames[game.id] ? "#10b981" : "var(--accent-primary)",
                         color: "#fff",
                         borderRadius: "50%",
                         width: "48px",
@@ -1248,10 +1159,16 @@ export const Dashboard: React.FC = () => {
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        boxShadow: isGameLocked ? "none" : "0 6px 12px rgba(79, 70, 229, 0.3)"
+                        boxShadow: isGameLocked ? "none" : completedGames[game.id] ? "0 6px 12px rgba(16, 185, 129, 0.3)" : "0 6px 12px rgba(79, 70, 229, 0.3)"
                       }}
                     >
-                      {isGameLocked ? <Lock size={20} fill="#fff" /> : <Play size={20} fill="#fff" />}
+                      {isGameLocked ? (
+                        <Lock size={20} fill="#fff" />
+                      ) : completedGames[game.id] ? (
+                        <RotateCcw size={20} />
+                      ) : (
+                        <Play size={20} fill="#fff" />
+                      )}
                     </div>
                   </div>
                 </PlayCard>

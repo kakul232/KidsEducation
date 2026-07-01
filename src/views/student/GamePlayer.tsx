@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { useApp } from "../../context/AppContext";
 import LocalDB from "../../services/db";
+import type { Game } from "../../services/db";
 import Sandbox from "../../components/Sandbox";
 import { ArrowLeft, Star, Volume2, Sparkles, Smile } from "lucide-react";
 import confetti from "canvas-confetti";
 import KidsLoader from "../../components/KidsLoader";
 
 export const GamePlayer: React.FC = () => {
-  const { currentPlayingGame, setPlayingGame, addStars, recordActivity, speakText } = useApp();
+  const { currentPlayingGame, setPlayingGame, addStars, recordActivity, speakText, currentStudent } = useApp();
+  const [localGame, setLocalGame] = useState<Game | null>(null);
   const [startTime, setStartTime] = useState<number>(Date.now());
   const [attempts, setAttempts] = useState(0);
   const [hintsUsed] = useState(0);
@@ -21,6 +23,7 @@ export const GamePlayer: React.FC = () => {
 
   useEffect(() => {
     if (currentPlayingGame) {
+      setLocalGame(currentPlayingGame);
       setIsLoadingGame(true);
       
       // Detect if replaying
@@ -234,6 +237,43 @@ export const GamePlayer: React.FC = () => {
     speakText(`Game Name: ${currentPlayingGame.title}`);
   };
 
+  const handleVoteGame = async (type: "like" | "dislike") => {
+    if (!currentStudent || !localGame) return;
+    try {
+      const studentId = currentStudent.id;
+      let likes = localGame.likes || [];
+      let dislikes = localGame.dislikes || [];
+
+      if (type === "like") {
+        if (likes.includes(studentId)) {
+          likes = likes.filter(id => id !== studentId);
+        } else {
+          likes = [...likes, studentId];
+          dislikes = dislikes.filter(id => id !== studentId);
+        }
+      } else {
+        if (dislikes.includes(studentId)) {
+          dislikes = dislikes.filter(id => id !== studentId);
+        } else {
+          dislikes = [...dislikes, studentId];
+          likes = likes.filter(id => id !== studentId);
+        }
+      }
+
+      const updatedGame: Game = {
+        ...localGame,
+        likes,
+        dislikes
+      };
+
+      await LocalDB.saveGame(updatedGame);
+      setLocalGame(updatedGame);
+      speakText(type === "like" ? "You liked this activity! 👍" : "You disliked this activity. 👎");
+    } catch (err) {
+      console.error("Failed to cast vote in GamePlayer:", err);
+    }
+  };
+
   return (
     <div className="container animate-slide-up" style={{ minHeight: "100vh", padding: "12px 8px 30px" }}>
       
@@ -376,6 +416,65 @@ export const GamePlayer: React.FC = () => {
                 +{starsAwarded} Stars!
               </span>
             </div>
+
+            {/* Voting Section */}
+            {localGame && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px", alignItems: "center", marginTop: "4px" }}>
+                <span style={{ fontSize: "0.95rem", fontWeight: "800", color: "var(--text-secondary)" }}>
+                  Did you like this activity?
+                </span>
+                <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
+                  <button
+                    onClick={() => handleVoteGame("like")}
+                    style={{
+                      border: "none",
+                      background: localGame.likes?.includes(currentStudent?.id || "") ? "#22c55e" : "#f1f5f9",
+                      color: localGame.likes?.includes(currentStudent?.id || "") ? "#ffffff" : "#475569",
+                      borderRadius: "14px",
+                      padding: "10px 18px",
+                      fontSize: "1rem",
+                      cursor: "pointer",
+                      fontWeight: "800",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      transition: "all 0.15s ease",
+                      boxShadow: "0 4px 0 rgba(0,0,0,0.05)",
+                      minHeight: "44px",
+                      minWidth: "60px",
+                      justifyContent: "center"
+                    }}
+                    title="Like this game!"
+                  >
+                    👍 <span style={{ fontSize: "0.8rem", opacity: 0.9 }}>{localGame.likes?.length || 0}</span>
+                  </button>
+                  <button
+                    onClick={() => handleVoteGame("dislike")}
+                    style={{
+                      border: "none",
+                      background: localGame.dislikes?.includes(currentStudent?.id || "") ? "#ef4444" : "#f1f5f9",
+                      color: localGame.dislikes?.includes(currentStudent?.id || "") ? "#ffffff" : "#475569",
+                      borderRadius: "14px",
+                      padding: "10px 18px",
+                      fontSize: "1rem",
+                      cursor: "pointer",
+                      fontWeight: "800",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      transition: "all 0.15s ease",
+                      boxShadow: "0 4px 0 rgba(0,0,0,0.05)",
+                      minHeight: "44px",
+                      minWidth: "60px",
+                      justifyContent: "center"
+                    }}
+                    title="Dislike this game"
+                  >
+                    👎 <span style={{ fontSize: "0.8rem", opacity: 0.9 }}>{localGame.dislikes?.length || 0}</span>
+                  </button>
+                </div>
+              </div>
+            )}
 
             <button
               onClick={() => setPlayingGame(null)}
