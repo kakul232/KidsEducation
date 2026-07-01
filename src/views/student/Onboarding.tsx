@@ -25,7 +25,6 @@ export const Onboarding: React.FC = () => {
   const [loginPhone, setLoginPhone] = useState("");
   const [foundStudents, setFoundStudents] = useState<Student[]>([]);
   const [hasSearchedLoginPhone, setHasSearchedLoginPhone] = useState(false);
-  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
 
   // Pattern Lock Flow States
   const [showPatternLock, setShowPatternLock] = useState<"set" | "verify" | null>(null);
@@ -93,7 +92,6 @@ export const Onboarding: React.FC = () => {
       const studentsList = await LocalDB.getStudentsByPhone(loginPhone.trim());
       setFoundStudents(studentsList);
       setHasSearchedLoginPhone(true);
-      setSelectedStudent(null);
     } catch (err) {
       console.error("Failed to query students by phone:", err);
       setErrorMsg("Failed to check profiles. Try again! 😊");
@@ -103,7 +101,6 @@ export const Onboarding: React.FC = () => {
   };
 
   const handleSelectLoginStudent = (student: Student) => {
-    setSelectedStudent(student);
     setPatternTargetStudent(student);
     if (student.patternLock) {
       setShowPatternLock("verify");
@@ -193,7 +190,6 @@ export const Onboarding: React.FC = () => {
             onCancel={() => {
               setShowPatternLock(null);
               setPatternTargetStudent(null);
-              setSelectedStudent(null);
             }}
             onForgot={() => {
               alert("🐸 Ribbit! Please ask Frog Uncle (+91 9871229599) or your educator to reset your pattern lock from the dashboard!");

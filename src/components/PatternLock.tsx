@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from "react";
-import { ChunkyButton } from "./ChunkyButton";
 
 interface PatternLockProps {
   mode: "set" | "verify";
