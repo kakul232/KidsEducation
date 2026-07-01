@@ -456,6 +456,35 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
+  const handleSaveAsDraft = async () => {
+    if (!generatedGame) return;
+
+    const newGame: Game = {
+      id: editingGameId || ("game_" + Math.random().toString(36).substr(2, 9)),
+      title: generatedGame.title,
+      topic: generatedGame.topic,
+      subject: "Mathematics",
+      age: generatedGame.age,
+      difficulty: generatedGame.difficulty as any,
+      htmlContent: draftCode,
+      published: false, // Save as Draft
+      createdAt: new Date().toISOString(),
+      assignedStudentId: assignedStudentId || ""
+    };
+
+    try {
+      await LocalDB.saveGame(newGame);
+      await loadData();
+      alert(editingGameId ? "Draft successfully updated! ✏️" : "Game successfully saved as Draft! 📁");
+      setGeneratedGame(null);
+      setEditingGameId(null);
+      setActiveTab("games");
+    } catch (err: any) {
+      console.error("Save as Draft failed:", err);
+      alert("Failed to save draft: " + (err.message || "Unknown database error."));
+    }
+  };
+
   const handleEditGame = (game: Game) => {
     setTopic(game.topic);
     setAge(game.age);
@@ -1157,6 +1186,14 @@ export const AdminDashboard: React.FC = () => {
                         style={{ padding: "8px 12px", fontSize: "0.8rem", boxShadow: "none" }}
                       >
                         {codeEditMode ? "View Sandbox" : "Edit HTML Code"}
+                      </button>
+                      <button
+                        onClick={handleSaveAsDraft}
+                        disabled={!generatedGame.isValid || !generatedGame.title.trim()}
+                        className="btn btn-gray"
+                        style={{ padding: "8px 12px", fontSize: "0.8rem", boxShadow: "none", backgroundColor: "#f1f5f9", border: "1.5px solid #cbd5e1", color: "#475569" }}
+                      >
+                        📁 Save as Draft
                       </button>
                       <button
                         onClick={handlePublish}

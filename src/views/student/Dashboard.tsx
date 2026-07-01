@@ -52,7 +52,7 @@ export const Dashboard: React.FC = () => {
     // 1. Helper to render games & logs from a given data set
     const renderGamesAndLogs = (allGames: Game[], allLogs: ActivityLog[]) => {
       const list = allGames.filter(
-        g => g.published && (!g.assignedStudentId || g.assignedStudentId === currentStudent?.id)
+        g => !g.assignedStudentId || g.assignedStudentId === currentStudent?.id
       );
 
       // Build completed games lookup map for current student
@@ -627,6 +627,26 @@ export const Dashboard: React.FC = () => {
                       }}
                     >
                       <span>{cleanTitle}</span>
+
+                      {/* Preview Upcoming Game tag if game is not published */}
+                      {!game.published && (
+                        <span
+                          style={{
+                            fontSize: "0.75rem",
+                            backgroundColor: "#f59e0b",
+                            color: "#ffffff",
+                            padding: "2px 8px",
+                            borderRadius: "8px",
+                            fontWeight: "900",
+                            letterSpacing: "0.05em",
+                            marginLeft: viewMode === "list" ? "10px" : "0",
+                            marginTop: viewMode === "list" ? "0" : "6px",
+                            lineHeight: "1"
+                          }}
+                        >
+                          Preview Upcoming Game
+                        </span>
+                      )}
 
                       {/* Animated NEW Tag for newly published games, hiding if completed */}
                       {isNew(game.createdAt) && !completedGames[game.id] && (
