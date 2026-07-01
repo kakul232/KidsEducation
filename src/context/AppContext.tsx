@@ -303,7 +303,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     const validUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-    const trialUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
     const createdAt = new Date().toISOString();
 
     if (matchedStudent) {
@@ -318,8 +317,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         userAgent: details.userAgent,
         browser: details.browser,
         deviceType: details.deviceType,
-        createdAt: matchedStudent.createdAt || createdAt,
-        trialUntil: matchedStudent.trialUntil || trialUntil
+        createdAt: matchedStudent.createdAt || createdAt
       };
 
       await LocalDB.saveStudent(updatedStudent);
@@ -345,8 +343,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         class: studentClass,
         phone,
         validUntil,
-        createdAt,
-        trialUntil
+        createdAt
       };
 
       await LocalDB.saveStudent(newStudent);

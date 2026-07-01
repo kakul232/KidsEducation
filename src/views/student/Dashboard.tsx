@@ -75,6 +75,34 @@ export const Dashboard: React.FC = () => {
   const [showFlexModal, setShowFlexModal] = useState(false);
   const [activeChallengeFriend, setActiveChallengeFriend] = useState<Student | null>(null);
   const [showChallengeModal, setShowChallengeModal] = useState(false);
+  const [showTrialPopup, setShowTrialPopup] = useState(false);
+
+  useEffect(() => {
+    if (currentStudent && !currentStudent.trialUntil && currentStudent.tier !== "paid") {
+      setShowTrialPopup(true);
+      speakText(`Hi ${currentStudent.name}! You have a free 7-day premium trial waiting for you! Tap to activate!`);
+    }
+  }, [currentStudent]);
+
+  const handleActivateTrial = async () => {
+    if (!currentStudent) return;
+    try {
+      const trialUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      const updated: Student = {
+        ...currentStudent,
+        trialUntil
+      };
+      await updateStudent(updated);
+      setShowTrialPopup(false);
+      speakText("Hooray! Your 7-day premium trial is now active! Go explore challenges and friends progress!");
+      setSocialSuccess("Hooray! Premium Trial Activated for 7 days! 💎");
+      setTimeout(() => setSocialSuccess(""), 4000);
+      fetchSocialData();
+    } catch (err) {
+      console.error("Failed to activate trial:", err);
+      setSocialError("Failed to activate trial. Please try again.");
+    }
+  };
 
   const fetchSocialData = async () => {
     if (!currentStudent) return;
@@ -1268,7 +1296,7 @@ export const Dashboard: React.FC = () => {
                     gap: "6px"
                   }}
                 >
-                  <span>💎 Upgrade Now (Simulated)</span>
+                  <span>💎 Upgrade Now</span>
                 </button>
               )}
             </div>
@@ -1431,210 +1459,6 @@ export const Dashboard: React.FC = () => {
             </PlayCard>
           )}
 
-          {/* Challenge & Flex Notifications Inbox */}
-          {challenges.length > 0 && (
-            <PlayCard style={{ padding: "20px", borderRadius: "20px" }}>
-              <h4 style={{ margin: "0 0 16px 0", fontSize: "1.1rem", fontWeight: "900", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "8px" }}>
-                <span>📬 Social Inbox</span>
-              </h4>
-              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                {challenges.map(chall => {
-                  const isReceived = chall.receiverId === currentStudent?.id;
-                  
-                  if (chall.type === "flex") {
-                    if (isReceived) {
-                      return (
-                        <div
-                          key={chall.id}
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            backgroundColor: "#f0fdf4",
-                            border: "2.5px solid #86efac",
-                            borderRadius: "14px",
-                            padding: "12px 16px",
-                            flexWrap: "wrap",
-                            gap: "10px"
-                          }}
-                        >
-                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                            <span style={{ fontSize: "1.5rem" }}>💪</span>
-                            <div style={{ textAlign: "left" }}>
-                              <strong>{chall.senderName}</strong> flexed a score of <strong>{chall.senderScore}</strong> correct in <strong>{chall.gameTitle}</strong>! Can you beat it? 🏆
-                              <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>Sent: {new Date(chall.createdAt).toLocaleTimeString()}</div>
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => handleDismissChallenge(chall.id)}
-                            style={{
-                              padding: "6px 12px",
-                              fontSize: "0.8rem",
-                              borderRadius: "8px",
-                              border: "1.5px solid #cbd5e1",
-                              backgroundColor: "#ffffff",
-                              color: "#475569",
-                              fontWeight: "800",
-                              cursor: "pointer"
-                            }}
-                          >
-                            Cool! 👍
-                          </button>
-                        </div>
-                      );
-                    }
-                    return null;
-                  }
-
-                  // It is a challenge
-                  if (isReceived) {
-                    if (chall.status === "pending") {
-                      return (
-                        <div
-                          key={chall.id}
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            backgroundColor: "#eff6ff",
-                            border: "2.5px solid #bfdbfe",
-                            borderRadius: "14px",
-                            padding: "12px 16px",
-                            flexWrap: "wrap",
-                            gap: "10px"
-                          }}
-                        >
-                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                            <span style={{ fontSize: "1.5rem" }}>⚔️</span>
-                            <div style={{ textAlign: "left" }}>
-                              <strong>{chall.senderName}</strong> challenged you to beat their score of <strong>{chall.senderScore}</strong> correct in <strong>{chall.gameTitle}</strong>!
-                              <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>Sent: {new Date(chall.createdAt).toLocaleTimeString()}</div>
-                            </div>
-                          </div>
-                          <div style={{ display: "flex", gap: "8px" }}>
-                            <button
-                              onClick={() => handlePlayChallenge(chall)}
-                              className="btn btn-primary animate-tag-pulse"
-                              style={{ padding: "8px 14px", fontSize: "0.85rem", borderRadius: "10px", border: "none", cursor: "pointer", boxShadow: "0 3px 0 var(--accent-secondary)" }}
-                            >
-                              Play & Beat it! 🎮
-                            </button>
-                            <button
-                              onClick={() => handleDismissChallenge(chall.id)}
-                              style={{
-                                padding: "8px 14px",
-                                fontSize: "0.85rem",
-                                borderRadius: "10px",
-                                border: "1.5px solid #cbd5e1",
-                                backgroundColor: "#ffffff",
-                                color: "#475569",
-                                fontWeight: "800",
-                                cursor: "pointer"
-                              }}
-                            >
-                              Ignore
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    } else if (chall.status === "completed") {
-                      const receiverBeatSender = (chall.receiverScore || 0) >= chall.senderScore;
-                      return (
-                        <div
-                          key={chall.id}
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            backgroundColor: receiverBeatSender ? "#ecfdf5" : "#fff5f5",
-                            border: receiverBeatSender ? "2.5px solid #a7f3d0" : "2.5px solid #fecaca",
-                            borderRadius: "14px",
-                            padding: "12px 16px",
-                            flexWrap: "wrap",
-                            gap: "10px"
-                          }}
-                        >
-                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                            <span style={{ fontSize: "1.5rem" }}>{receiverBeatSender ? "🏆" : "🧸"}</span>
-                            <div style={{ textAlign: "left" }}>
-                              {receiverBeatSender ? (
-                                <span>You beat <strong>{chall.senderName}</strong>'s challenge! (You scored <strong>{chall.receiverScore}</strong>, beating their score of <strong>{chall.senderScore}</strong> in <strong>{chall.gameTitle}</strong>!) 🎉</span>
-                              ) : (
-                                <span>You played <strong>{chall.senderName}</strong>'s challenge. (You scored <strong>{chall.receiverScore}</strong>. They scored <strong>{chall.senderScore}</strong> in <strong>{chall.gameTitle}</strong>). Keep practicing! 😊</span>
-                              )}
-                              <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>Completed: {new Date(chall.createdAt).toLocaleDateString()}</div>
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => handleDismissChallenge(chall.id)}
-                            style={{
-                              padding: "6px 12px",
-                              fontSize: "0.8rem",
-                              borderRadius: "8px",
-                              border: "1.5px solid #cbd5e1",
-                              backgroundColor: "#ffffff",
-                              color: "#475569",
-                              fontWeight: "800",
-                              cursor: "pointer"
-                            }}
-                          >
-                            Dismiss
-                          </button>
-                        </div>
-                      );
-                    }
-                  } else {
-                    // Sent challenges updates
-                    if (chall.status === "completed") {
-                      const receiverBeatSender = (chall.receiverScore || 0) >= chall.senderScore;
-                      return (
-                        <div
-                          key={chall.id}
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            backgroundColor: "#faf5ff",
-                            border: "2.5px solid #e9d5ff",
-                            borderRadius: "14px",
-                            padding: "12px 16px",
-                            flexWrap: "wrap",
-                            gap: "10px"
-                          }}
-                        >
-                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                            <span style={{ fontSize: "1.5rem" }}>🏁</span>
-                            <div style={{ textAlign: "left" }}>
-                              <strong>{chall.receiverName}</strong> completed your challenge in <strong>{chall.gameTitle}</strong>!<br />
-                              Score details: {chall.receiverName}: <strong>{chall.receiverScore}</strong> vs You: <strong>{chall.senderScore}</strong>.
-                              {receiverBeatSender ? " They beat your score! 😮" : " You stayed ahead! 😎"}
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => handleDismissChallenge(chall.id)}
-                            style={{
-                              padding: "6px 12px",
-                              fontSize: "0.8rem",
-                              borderRadius: "8px",
-                              border: "1.5px solid #cbd5e1",
-                              backgroundColor: "#ffffff",
-                              color: "#475569",
-                              fontWeight: "800",
-                              cursor: "pointer"
-                            }}
-                          >
-                            Dismiss
-                          </button>
-                        </div>
-                      );
-                    }
-                  }
-                  return null;
-                })}
-              </div>
-            </PlayCard>
-          )}
-
           {/* My Own Highscores (For flexing) */}
           {isPremium(currentStudent) && myHighscores.length > 0 && (
             <PlayCard style={{ padding: "20px", borderRadius: "20px" }}>
@@ -1682,6 +1506,230 @@ export const Dashboard: React.FC = () => {
                   </div>
                 ))}
               </div>
+            </PlayCard>
+          )}
+
+          {/* Challenge & Flex Notifications Inbox */}
+          {isPremium(currentStudent) && (
+            <PlayCard style={{ padding: "20px", borderRadius: "20px" }}>
+              <h4 style={{ margin: "0 0 16px 0", fontSize: "1.1rem", fontWeight: "900", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "8px" }}>
+                <span>📬 Social Inbox</span>
+              </h4>
+              
+              {(() => {
+                const visibleInboxChallenges = challenges.filter(chall => {
+                  const isReceived = chall.receiverId === currentStudent?.id;
+                  if (chall.type === "flex") {
+                    return isReceived;
+                  }
+                  if (isReceived) {
+                    return chall.status === "pending" || chall.status === "completed";
+                  } else {
+                    return chall.status === "completed";
+                  }
+                });
+
+                if (visibleInboxChallenges.length === 0) {
+                  return (
+                    <div style={{ textAlign: "center", padding: "30px 10px", color: "var(--text-secondary)", fontWeight: "600" }}>
+                      <span style={{ fontSize: "2.5rem", display: "block", marginBottom: "8px" }}>🎈</span>
+                      No Challenge / Flex from your Buddy
+                    </div>
+                  );
+                }
+
+                return (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                    {visibleInboxChallenges.map(chall => {
+                      const isReceived = chall.receiverId === currentStudent?.id;
+                      
+                      if (chall.type === "flex") {
+                        return (
+                          <div
+                            key={chall.id}
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              backgroundColor: "#f0fdf4",
+                              border: "2.5px solid #86efac",
+                              borderRadius: "14px",
+                              padding: "12px 16px",
+                              flexWrap: "wrap",
+                              gap: "10px"
+                            }}
+                          >
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                              <span style={{ fontSize: "1.5rem" }}>💪</span>
+                              <div style={{ textAlign: "left" }}>
+                                <strong>{chall.senderName}</strong> flexed a score of <strong>{chall.senderScore}</strong> correct in <strong>{chall.gameTitle}</strong>! Can you beat it? 🏆
+                                <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>Sent: {new Date(chall.createdAt).toLocaleTimeString()}</div>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => handleDismissChallenge(chall.id)}
+                              style={{
+                                padding: "6px 12px",
+                                fontSize: "0.8rem",
+                                borderRadius: "8px",
+                                border: "1.5px solid #cbd5e1",
+                                backgroundColor: "#ffffff",
+                                color: "#475569",
+                                fontWeight: "800",
+                                cursor: "pointer"
+                              }}
+                            >
+                              Cool! 👍
+                            </button>
+                          </div>
+                        );
+                      }
+
+                      // It is a challenge
+                      if (isReceived) {
+                        if (chall.status === "pending") {
+                          return (
+                            <div
+                              key={chall.id}
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                backgroundColor: "#eff6ff",
+                                border: "2.5px solid #bfdbfe",
+                                borderRadius: "14px",
+                                padding: "12px 16px",
+                                flexWrap: "wrap",
+                                gap: "10px"
+                              }}
+                            >
+                              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                <span style={{ fontSize: "1.5rem" }}>⚔️</span>
+                                <div style={{ textAlign: "left" }}>
+                                  <strong>{chall.senderName}</strong> challenged you to beat their score of <strong>{chall.senderScore}</strong> correct in <strong>{chall.gameTitle}</strong>!
+                                  <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>Sent: {new Date(chall.createdAt).toLocaleTimeString()}</div>
+                                </div>
+                              </div>
+                              <div style={{ display: "flex", gap: "8px" }}>
+                                <button
+                                  onClick={() => handlePlayChallenge(chall)}
+                                  className="btn btn-primary animate-tag-pulse"
+                                  style={{ padding: "8px 14px", fontSize: "0.85rem", borderRadius: "10px", border: "none", cursor: "pointer", boxShadow: "0 3px 0 var(--accent-secondary)" }}
+                                >
+                                  Play & Beat it! 🎮
+                                </button>
+                                <button
+                                  onClick={() => handleDismissChallenge(chall.id)}
+                                  style={{
+                                    padding: "8px 14px",
+                                    fontSize: "0.85rem",
+                                    borderRadius: "10px",
+                                    border: "1.5px solid #cbd5e1",
+                                    backgroundColor: "#ffffff",
+                                    color: "#475569",
+                                    fontWeight: "800",
+                                    cursor: "pointer"
+                                  }}
+                                >
+                                  Ignore
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        } else {
+                          const receiverBeatSender = (chall.receiverScore || 0) >= chall.senderScore;
+                          return (
+                            <div
+                              key={chall.id}
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                backgroundColor: receiverBeatSender ? "#ecfdf5" : "#fff5f5",
+                                border: receiverBeatSender ? "2.5px solid #a7f3d0" : "2.5px solid #fecaca",
+                                borderRadius: "14px",
+                                padding: "12px 16px",
+                                flexWrap: "wrap",
+                                gap: "10px"
+                              }}
+                            >
+                              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                <span style={{ fontSize: "1.5rem" }}>{receiverBeatSender ? "🏆" : "🧸"}</span>
+                                <div style={{ textAlign: "left" }}>
+                                  {receiverBeatSender ? (
+                                    <span>You beat <strong>{chall.senderName}</strong>'s challenge! (You scored <strong>{chall.receiverScore}</strong>, beating their score of <strong>{chall.senderScore}</strong> in <strong>{chall.gameTitle}</strong>!) 🎉</span>
+                                  ) : (
+                                    <span>You played <strong>{chall.senderName}</strong>'s challenge. (You scored <strong>{chall.receiverScore}</strong>. They scored <strong>{chall.senderScore}</strong> in <strong>{chall.gameTitle}</strong>). Keep practicing! 😊</span>
+                                  )}
+                                  <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>Completed: {new Date(chall.createdAt).toLocaleDateString()}</div>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => handleDismissChallenge(chall.id)}
+                                style={{
+                                  padding: "6px 12px",
+                                  fontSize: "0.8rem",
+                                  borderRadius: "8px",
+                                  border: "1.5px solid #cbd5e1",
+                                  backgroundColor: "#ffffff",
+                                  color: "#475569",
+                                  fontWeight: "800",
+                                  cursor: "pointer"
+                                }}
+                              >
+                                Dismiss
+                              </button>
+                            </div>
+                          );
+                        }
+                      } else {
+                        // Sent challenges updates
+                        const receiverBeatSender = (chall.receiverScore || 0) >= chall.senderScore;
+                        return (
+                          <div
+                            key={chall.id}
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              backgroundColor: "#faf5ff",
+                              border: "2.5px solid #e9d5ff",
+                              borderRadius: "14px",
+                              padding: "12px 16px",
+                              flexWrap: "wrap",
+                              gap: "10px"
+                            }}
+                          >
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                              <span style={{ fontSize: "1.5rem" }}>🏁</span>
+                              <div style={{ textAlign: "left" }}>
+                                <strong>{chall.receiverName}</strong> completed your challenge in <strong>{chall.gameTitle}</strong>!<br />
+                                Score details: {chall.receiverName}: <strong>{chall.receiverScore}</strong> vs You: <strong>{chall.senderScore}</strong>.
+                                {receiverBeatSender ? " They beat your score! 😮" : " You stayed ahead! 😎"}
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => handleDismissChallenge(chall.id)}
+                              style={{
+                                padding: "6px 12px",
+                                fontSize: "0.8rem",
+                                borderRadius: "8px",
+                                border: "1.5px solid #cbd5e1",
+                                backgroundColor: "#ffffff",
+                                color: "#475569",
+                                fontWeight: "800",
+                                cursor: "pointer"
+                              }}
+                            >
+                              Dismiss
+                            </button>
+                          </div>
+                        );
+                      }
+                    })}
+                  </div>
+                );
+              })()}
             </PlayCard>
           )}
 
@@ -1854,7 +1902,7 @@ export const Dashboard: React.FC = () => {
                                 className="btn btn-success"
                                 style={{ padding: "6px 12px", fontSize: "0.8rem", borderRadius: "8px", marginTop: "4px" }}
                               >
-                                💎 Simulate Upgrade
+                                💎 Upgrade Now
                               </button>
                             </div>
                           ) : (
@@ -2453,6 +2501,87 @@ export const Dashboard: React.FC = () => {
                 Not Now
               </button>
             </div>
+          </PlayCard>
+        </div>
+      )}
+
+      {/* 7. Try Premium for 7 days Trial Popup */}
+      {showTrialPopup && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(15, 23, 42, 0.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 10010,
+            padding: "20px",
+            backdropFilter: "blur(6px)"
+          }}
+        >
+          <PlayCard
+            style={{
+              maxWidth: "380px",
+              width: "100%",
+              padding: "32px 24px",
+              backgroundColor: "#eff6ff",
+              border: "4px solid #3b82f6",
+              borderRadius: "24px",
+              textAlign: "center",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "20px",
+              boxShadow: "0 12px 24px rgba(59, 130, 246, 0.2)"
+            }}
+          >
+            <div style={{ fontSize: "4.5rem", animation: "bounce 2s infinite" }}>🎁</div>
+            
+            <h3 style={{ margin: 0, fontSize: "1.6rem", fontWeight: "900", color: "#1e3a8a" }}>
+              Try Premium Free! 🌟
+            </h3>
+            
+            <p style={{ color: "#1e40af", fontSize: "1.05rem", fontWeight: "700", margin: 0, lineHeight: "1.5" }}>
+              Hey {currentStudent?.name || "there"}! <br />
+              Activate your <strong>7-Day Free Trial</strong> to play custom games, challenge friends, and see high scores!
+            </p>
+
+            <button
+              onClick={handleActivateTrial}
+              className="btn btn-success animate-tag-pulse"
+              style={{
+                width: "100%",
+                padding: "16px",
+                fontSize: "1.15rem",
+                fontWeight: "900",
+                backgroundColor: "#22c55e",
+                borderColor: "#16a34a",
+                color: "#ffffff",
+                borderRadius: "16px",
+                boxShadow: "0 4px 0 #16a34a",
+                cursor: "pointer",
+                border: "none"
+              }}
+            >
+              🚀 Start My 7-Day Trial!
+            </button>
+
+            <button
+              onClick={() => setShowTrialPopup(false)}
+              className="btn btn-gray"
+              style={{
+                width: "100%",
+                padding: "10px",
+                fontSize: "0.9rem",
+                fontWeight: "800"
+              }}
+            >
+              Maybe Later
+            </button>
           </PlayCard>
         </div>
       )}

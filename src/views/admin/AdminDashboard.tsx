@@ -237,6 +237,52 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
+  const handleBulkPremiumStudents = async () => {
+    if (selectedStudentIds.length === 0) return;
+    const count = selectedStudentIds.length;
+    try {
+      await Promise.all(selectedStudentIds.map(async (id) => {
+        const student = students.find(s => s.id === id);
+        if (student) {
+          const updated = {
+            ...student,
+            tier: "paid" as const
+          };
+          await LocalDB.saveStudent(updated);
+        }
+      }));
+      alert(`Successfully upgraded ${count} student(s) to Premium! 💎`);
+      setSelectedStudentIds([]);
+      loadData();
+    } catch (err: any) {
+      console.error("Bulk premium update failed:", err);
+      alert("Failed to update selected students tier: " + err.message);
+    }
+  };
+
+  const handleBulkFreeStudents = async () => {
+    if (selectedStudentIds.length === 0) return;
+    const count = selectedStudentIds.length;
+    try {
+      await Promise.all(selectedStudentIds.map(async (id) => {
+        const student = students.find(s => s.id === id);
+        if (student) {
+          const updated = {
+            ...student,
+            tier: "free" as const
+          };
+          await LocalDB.saveStudent(updated);
+        }
+      }));
+      alert(`Successfully changed ${count} student(s) to Free tier! 🆓`);
+      setSelectedStudentIds([]);
+      loadData();
+    } catch (err: any) {
+      console.error("Bulk free update failed:", err);
+      alert("Failed to update selected students tier: " + err.message);
+    }
+  };
+
   const handleToggleStudentTier = async (student: Student) => {
     try {
       const updated = {
@@ -244,7 +290,7 @@ export const AdminDashboard: React.FC = () => {
         tier: student.tier === "paid" ? "free" : ("paid" as any)
       };
       await LocalDB.saveStudent(updated);
-      alert(`Updated ${student.name}'s tier to ${updated.tier === "paid" ? "💎 Paid" : "🆓 Free"}`);
+      alert(`Updated ${student.name}'s tier to ${updated.tier === "paid" ? "💎 Premium" : "🆓 Free"}`);
       loadData();
     } catch (err: any) {
       console.error("Failed to toggle student tier:", err);
@@ -747,23 +793,56 @@ export const AdminDashboard: React.FC = () => {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
                 <h3 style={{ fontSize: "1.1rem", margin: 0 }}>Active Students ({students.length})</h3>
                 {selectedStudentIds.length > 0 && (
-                  <button
-                    onClick={handleBulkDeleteStudents}
-                    className="btn"
-                    style={{
-                      padding: "8px 14px",
-                      backgroundColor: "#fee2e2",
-                      border: "1.5px solid #ef4444",
-                      color: "#b91c1c",
-                      borderRadius: "10px",
-                      fontSize: "0.8rem",
-                      fontWeight: "800",
-                      boxShadow: "none",
-                      cursor: "pointer"
-                    }}
-                  >
-                    🗑️ Delete Selected ({selectedStudentIds.length})
-                  </button>
+                  <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                    <button
+                      onClick={handleBulkPremiumStudents}
+                      className="btn btn-success"
+                      style={{
+                        padding: "8px 14px",
+                        fontSize: "0.8rem",
+                        fontWeight: "800",
+                        borderRadius: "10px",
+                        boxShadow: "none",
+                        cursor: "pointer"
+                      }}
+                    >
+                      💎 Make Premium ({selectedStudentIds.length})
+                    </button>
+                    <button
+                      onClick={handleBulkFreeStudents}
+                      className="btn"
+                      style={{
+                        padding: "8px 14px",
+                        fontSize: "0.8rem",
+                        fontWeight: "800",
+                        borderRadius: "10px",
+                        boxShadow: "none",
+                        backgroundColor: "#f1f5f9",
+                        border: "1.5px solid #cbd5e1",
+                        color: "#475569",
+                        cursor: "pointer"
+                      }}
+                    >
+                      🆓 Make Free ({selectedStudentIds.length})
+                    </button>
+                    <button
+                      onClick={handleBulkDeleteStudents}
+                      className="btn"
+                      style={{
+                        padding: "8px 14px",
+                        backgroundColor: "#fee2e2",
+                        border: "1.5px solid #ef4444",
+                        color: "#b91c1c",
+                        borderRadius: "10px",
+                        fontSize: "0.8rem",
+                        fontWeight: "800",
+                        boxShadow: "none",
+                        cursor: "pointer"
+                      }}
+                    >
+                      🗑️ Delete ({selectedStudentIds.length})
+                    </button>
+                  </div>
                 )}
               </div>
               {students.length === 0 ? (
@@ -812,7 +891,7 @@ export const AdminDashboard: React.FC = () => {
                                   fontWeight: "800"
                                 }}
                               >
-                                {std.tier === "paid" ? "💎 Paid" : "🆓 Free"}
+                                {std.tier === "paid" ? "💎 Premium" : "🆓 Free"}
                               </span>
                             </div>
                             <span style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>
@@ -839,7 +918,7 @@ export const AdminDashboard: React.FC = () => {
                               cursor: "pointer"
                             }}
                           >
-                            {std.tier === "paid" ? "🆓 Make Free" : "💎 Make Paid"}
+                            {std.tier === "paid" ? "🆓 Make Free" : "💎 Make Premium"}
                           </button>
                           <button
                             onClick={() => handleExtendValidity(std.id)}
