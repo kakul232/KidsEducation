@@ -20,6 +20,7 @@ export interface Student {
   tier?: "free" | "paid";
   createdAt?: string;
   trialUntil?: string;
+  patternLock?: string;
 }
 
 export interface AttemptDetail {
@@ -785,6 +786,17 @@ export const LocalDB = {
     } catch (e) {
       console.error("Firestore getStudentByPhone failed", e);
       return undefined;
+    }
+  },
+
+  async getStudentsByPhone(phone: string): Promise<Student[]> {
+    try {
+      const q = query(collection(db, "students"), where("phone", "==", phone));
+      const snap = await getDocs(q);
+      return snap.docs.map(doc => doc.data() as Student);
+    } catch (e) {
+      console.error("Firestore getStudentsByPhone failed", e);
+      return [];
     }
   },
 

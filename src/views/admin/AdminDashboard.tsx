@@ -6,6 +6,7 @@ import { generateGame } from "../../services/gemini";
 import type { GeneratedGameResponse } from "../../services/gemini";
 import Sandbox from "../../components/Sandbox";
 import KidsLoader from "../../components/KidsLoader";
+import { PatternLock } from "../../components/PatternLock";
 import {
   BarChart3,
   Cpu,
@@ -97,6 +98,7 @@ export const AdminDashboard: React.FC = () => {
   const [selectedDetailLog, setSelectedDetailLog] = useState<ActivityLog | null>(null);
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [groupByPhone, setGroupByPhone] = useState(false);
+  const [patternModalStudent, setPatternModalStudent] = useState<Student | null>(null);
 
   // Settings
   const [apiKeyInput, setApiKeyInput] = useState(geminiApiKey);
@@ -220,6 +222,23 @@ export const AdminDashboard: React.FC = () => {
     setSelectedStudentIds(prev => 
       prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
     );
+  };
+
+  const handleSaveStudentPattern = async (pattern: string) => {
+    if (!patternModalStudent) return;
+    try {
+      const updated = {
+        ...patternModalStudent,
+        patternLock: pattern
+      };
+      await LocalDB.saveStudent(updated);
+      alert(`Successfully set Pattern Lock for ${patternModalStudent.name}!`);
+      setPatternModalStudent(null);
+      loadData();
+    } catch (e) {
+      console.error("Failed to set student pattern lock:", e);
+      alert("Failed to set pattern lock.");
+    }
   };
 
   const handleBulkDeleteStudents = async () => {
@@ -1023,7 +1042,7 @@ export const AdminDashboard: React.FC = () => {
                                           </span>
                                         </div>
                                         <span style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>
-                                          Age: {std.age || "N/A"} | Class: {std.class || "N/A"}
+                                          Age: {std.age || "N/A"} | Class: {std.class || "N/A"} | Pattern: {std.patternLock ? "🔒 Set" : "🔓 Not Set"}
                                         </span>
                                         <span style={{ fontSize: "0.8rem", color: isExpired ? "#ef4444" : "#10b981", fontWeight: "800" }}>
                                           {isExpired ? "⏰ Expired" : "✓ Active"} (Expires: {std.validUntil ? new Date(std.validUntil).toLocaleDateString() : "Never"})
@@ -1047,6 +1066,22 @@ export const AdminDashboard: React.FC = () => {
                                         }}
                                       >
                                         {std.tier === "paid" ? "🆓 Make Free" : "💎 Make Premium"}
+                                      </button>
+                                      <button
+                                        onClick={() => setPatternModalStudent(std)}
+                                        className="btn"
+                                        style={{
+                                          padding: "6px 10px",
+                                          fontSize: "0.75rem",
+                                          boxShadow: "none",
+                                          backgroundColor: "#e0f2fe",
+                                          border: "1.5px solid #0284c7",
+                                          color: "#0369a1",
+                                          fontWeight: "800",
+                                          cursor: "pointer"
+                                        }}
+                                      >
+                                        🔑 Pattern
                                       </button>
                                       <button
                                         onClick={() => handleExtendValidity(std.id)}
@@ -1121,7 +1156,7 @@ export const AdminDashboard: React.FC = () => {
                               </span>
                             </div>
                             <span style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>
-                              Age: {std.age || "N/A"} | Class: {std.class || "N/A"} | Phone: {std.phone || "N/A"}
+                              Age: {std.age || "N/A"} | Class: {std.class || "N/A"} | Phone: {std.phone || "N/A"} | Pattern: {std.patternLock ? "🔒 Set" : "🔓 Not Set"}
                             </span>
                             <span style={{ fontSize: "0.8rem", color: isExpired ? "#ef4444" : "#10b981", fontWeight: "800" }}>
                               {isExpired ? "⏰ Expired" : "✓ Active"} (Expires: {std.validUntil ? new Date(std.validUntil).toLocaleDateString() : "Never"})
@@ -1145,6 +1180,22 @@ export const AdminDashboard: React.FC = () => {
                             }}
                           >
                             {std.tier === "paid" ? "🆓 Make Free" : "💎 Make Premium"}
+                          </button>
+                          <button
+                            onClick={() => setPatternModalStudent(std)}
+                            className="btn"
+                            style={{
+                              padding: "6px 10px",
+                              fontSize: "0.75rem",
+                              boxShadow: "none",
+                              backgroundColor: "#e0f2fe",
+                              border: "1.5px solid #0284c7",
+                              color: "#0369a1",
+                              fontWeight: "800",
+                              cursor: "pointer"
+                            }}
+                          >
+                            🔑 Pattern
                           </button>
                           <button
                             onClick={() => handleExtendValidity(std.id)}
@@ -2412,6 +2463,78 @@ export const AdminDashboard: React.FC = () => {
             </div>
           </div>
         )}
+
+            {/* Pattern Lock Set Modal for Student */}
+            {patternModalStudent && (
+              <div
+                style={{
+                  position: "fixed",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  backgroundColor: "rgba(15, 23, 42, 0.4)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  zIndex: 10000,
+                  padding: "20px",
+                  backdropFilter: "blur(4px)"
+                }}
+              >
+                <div
+                  className="play-card"
+                  style={{
+                    maxWidth: "400px",
+                    width: "100%",
+                    padding: "24px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "16px",
+                    backgroundColor: "var(--bg-secondary)",
+                    border: "4px solid var(--accent-primary)"
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "2px solid #cbd5e1", paddingBottom: "10px" }}>
+                    <h3 style={{ fontSize: "1.2rem", fontWeight: "900", margin: 0 }}>
+                      🔑 Set Pattern Lock
+                    </h3>
+                    <button
+                      onClick={() => setPatternModalStudent(null)}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        fontSize: "1.5rem",
+                        cursor: "pointer",
+                        fontWeight: "900",
+                        color: "var(--text-secondary)"
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                  <div style={{ textAlign: "center" }}>
+                    <p style={{ margin: "2px 0", fontSize: "0.95rem" }}>
+                      Setting pattern for student: <strong>{patternModalStudent.name}</strong>
+                    </p>
+                    {patternModalStudent.patternLock ? (
+                      <span style={{ fontSize: "0.8rem", color: "var(--success)", fontWeight: "700" }}>
+                        ✓ Current Pattern: {patternModalStudent.patternLock}
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: "0.8rem", color: "var(--accent-primary)", fontWeight: "700" }}>
+                        ⚠️ No Pattern Lock Set Yet
+                      </span>
+                    )}
+                  </div>
+                  <PatternLock
+                    mode="set"
+                    onSuccess={handleSaveStudentPattern}
+                    onCancel={() => setPatternModalStudent(null)}
+                  />
+                </div>
+              </div>
+            )}
 
       </div>
     </div>

@@ -24,7 +24,7 @@ interface AppContextType {
   geminiApiKey: string;
   speakText: (text: string) => void;
   setView: (view: ViewState) => void;
-  setOnboarding: (name: string, avatar: string, age: number | undefined, studentClass: string, phone: string) => Promise<void>;
+  setOnboarding: (name: string, avatar: string, age: number | undefined, studentClass: string, phone: string, patternLock?: string) => Promise<void>;
   setPlayingGame: (game: Game | null) => void;
   updateAccessibility: (config: Partial<AccessibilityConfig>) => void;
   saveApiKey: (key: string) => Promise<void> | void;
@@ -283,7 +283,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const setOnboarding = async (name: string, avatar: string, age: number | undefined, studentClass: string, phone: string) => {
+  const setOnboarding = async (name: string, avatar: string, age: number | undefined, studentClass: string, phone: string, patternLock?: string) => {
     // Collect IP, Device ID, and system metadata
     const details = await getClientDetails();
     
@@ -320,6 +320,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         createdAt: matchedStudent.createdAt || createdAt
       };
 
+      if (patternLock) {
+        updatedStudent.patternLock = patternLock;
+      }
+
       await LocalDB.saveStudent(updatedStudent);
       localStorage.setItem("active_student_id", updatedStudent.id);
       setCurrentStudent(updatedStudent);
@@ -343,7 +347,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         class: studentClass,
         phone,
         validUntil,
-        createdAt
+        createdAt,
+        patternLock
       };
 
       await LocalDB.saveStudent(newStudent);

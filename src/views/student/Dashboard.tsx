@@ -877,18 +877,17 @@ export const Dashboard: React.FC = () => {
       )}
 
       {/* Subject Selector using Reusable PlayCard */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "12px", marginBottom: "24px" }}>
-        {SUBJECTS.map(subject => (
+      <div style={{ display: "grid", gridTemplateColumns: `repeat(${SUBJECTS.filter(s => s.enabled).length}, 1fr)`, gap: "12px", marginBottom: "24px" }}>
+        {SUBJECTS.filter(s => s.enabled).map(subject => (
           <PlayCard
             key={subject.id}
-            onClick={subject.enabled ? () => setSelectedSubject(subject.id) : undefined}
+            onClick={() => setSelectedSubject(subject.id)}
             style={{
               backgroundColor: subject.color,
               borderColor: selectedSubject === subject.id ? "var(--text-primary)" : subject.border,
               borderWidth: "3px",
               borderStyle: selectedSubject === subject.id ? "solid" : "dashed",
-              opacity: subject.enabled ? 1 : 0.6,
-              cursor: subject.enabled ? "pointer" : "not-allowed",
+              cursor: "pointer",
               padding: "16px",
               textAlign: "center",
               display: "flex",
@@ -900,11 +899,6 @@ export const Dashboard: React.FC = () => {
             <span style={{ fontSize: "1.1rem", fontWeight: "800", color: "#1e293b" }}>
               {subject.title}
             </span>
-            {!subject.enabled && (
-              <span style={{ fontSize: "0.75rem", fontWeight: "700", color: "#64748b" }}>
-                Coming Soon
-              </span>
-            )}
           </PlayCard>
         ))}
       </div>
