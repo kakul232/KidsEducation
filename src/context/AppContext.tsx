@@ -385,6 +385,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setCurrentView("game_player");
       // Read game title out loud
       speakText(`Playing ${game.title}. Let's have fun!`);
+
+      // Store game for offline play in local cache
+      try {
+        const cached = LocalDB.getCachedGames();
+        const idx = cached.findIndex(g => g.id === game.id);
+        if (idx > -1) {
+          cached[idx] = game;
+        } else {
+          cached.push(game);
+        }
+        LocalDB.setCachedGames(cached);
+        console.log(`Saved game "${game.title}" offline.`);
+      } catch (err) {
+        console.warn("Failed to cache game offline:", err);
+      }
     } else {
       setCurrentView("dashboard");
     }

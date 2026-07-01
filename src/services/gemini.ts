@@ -68,33 +68,44 @@ export async function generateGame(
   apiKey?: string,
   customInstruction?: string,
   rounds: number | "infinite" = 5,
-  originalHtml?: string
+  originalHtml?: string,
+  dyslexiaTypography: boolean = false
 ): Promise<GeneratedGameResponse> {
   let prompt = `Generate a single-file interactive educational HTML game for a child aged ${age} facing dyslexia.
 Subject: ${subject}
 Topic: ${topic}
 Difficulty: ${difficulty}
 
-Here are reference examples of high-quality, verified HTML games from our games folder showing how the layout, mobile-first touch/swipe controls (direct canvas gestures, no D-pad), aspect ratios, and event triggers should be implemented:
+Strict UX & Dyslexia-Friendly Constraints:
+1. Typography: ${dyslexiaTypography ? "Use dyslexia-friendly fonts like 'Comic Neue', 'Comic Sans MS', or 'Arial Rounded MT Bold' as fallback. Apply styling: letter-spacing: 0.1em; line-height: 1.6; font-weight: bold; font-size: clamp(16px, 4vw, 24px). Avoid all-caps text; use mixed case for better word-shape recognition." : "Use normal, standard readable web typography (standard modern sans-serif fonts, default letter-spacing, normal weight, clean readable sizes) without specialized dyslexia font adjustments."}
+2. High Readability Contrast: Use soft, warm off-white or light pastel backgrounds (e.g., cream #fdfbf7, soft lavender #f5f3ff, pale sky-blue #f0f9ff, soft mint #f0fdf4) instead of stark pure white to reduce visual stress. Use high-contrast dark text colors (like dark slate #1e293b, dark purple #4c1d95, or dark blue #0369a1). Avoid pure black-on-white.
+3. Multi-Sensory Feedback & Text-to-Speech:
+   - Speech Read-Aloud: Include a clearly visible, fun TTS button/icon (e.g. "🔊 Listen") next to the main instruction/question. Clicking this button MUST trigger the Web Speech API (window.speechSynthesis) to read the question or instruction text aloud in a clean child-friendly voice.
+   - Audio Feedback: Include visual audio feedback using HTML5 Web Audio API (AudioContext synthesizer chimes) for correct (high-pitched happy chime) and incorrect (lower-pitched friendly sound) answers.
+   - Visual Feedback: On correct answers, show a temporary fullscreen overlay animation with celebratory emoji elements (e.g. "Awesome! 🌟", "Hurray! 🎉", "Great Job! 🎈"). On incorrect attempts, show friendly positive encouragement (e.g. "Oops! Let's try again! 🧸", "Nice try! Keep going! ❤️") rather than negative text or sounds.
+4. Visual Quantity Supports: For counting and arithmetic topics, represent numbers visually using countable emojis or shapes (e.g. show 5 apples 🍎🍎🍎🍎🍎 next to the number 5) to help the child map numeric symbols to concrete quantities.
+5. Large Touch Targets & Layout Spacing: Clickable items, buttons, bubbles, and cards must be large (minimum 60px by 60px touch area) and widely spaced to prevent accidental mis-clicks and motor frustration.
+6. Reversal Prevention: Place a distinct visual decoration or line underneath easily confused numbers (such as underline under 6 and 9) or letters (such as color-coding 'b' vs 'd') to assist children in spatial distinction.
+7. Stress-Free Environment: NEVER include countdown timers, time limits, or penalty buzzers. Let the child complete tasks at their own relaxed pace.
 
-Strict Constraints:
-1. Return ONLY a valid JSON object in this format:
+Layout & Technical Constraints:
+8. Full Viewport Responsive Scaling:
+   - The entire game must fit exactly within a vertical mobile portrait viewport (aspect ratio 9:16 or 3:4) with NO scrollbars (use CSS 'overflow: hidden; height: 100vh; box-sizing: border-box;' on body).
+   - Use CSS Flexbox ('display: flex; flex-direction: column; justify-content: space-between;') to scale elements dynamically. The main interactive game area / canvas / play board must use 'flex: 1' or 'flex-grow: 1' to fill all available space between the header and the bottom settings.
+   - Scale button paddings, grid layouts, canvas drawings, and font sizes using relative units (vh, vw, rem, clamp) so it remains perfectly legible on small screens without leaving empty gaps at the bottom.
+9. Rounds Limit & Parent Communication:
+   - For every single response or question answered by the student, immediately post a details message to the parent: parent.postMessage({ type: 'game_action', success: true/false, question: 'Question text', answer: 'Student answer' }, '*').
+   - Rounds limit: ${rounds === "infinite" ? "Infinite rounds (continuous gameplay). Keep generating new tasks/questions loops endlessly, and send parent.postMessage({ type: 'game_complete', success: true, correctCount: 1, incorrectCount: 0 }, '*') after each correct answer." : `exactly ${rounds} round(s). The game must display round progress clearly on screen (e.g. 'Round 1 of ${rounds}'). ONLY send parent.postMessage({ type: 'game_complete', success: true, correctCount: ${rounds}, incorrectCount: X }, '*') after the user successfully completes the final round.`}
+   - Incorrect answers: parent.postMessage({ type: 'game_attempt', success: false }, '*') after any incorrect attempt.
+10. Strict Security Validation:
+    - The HTML content must be self-contained: do not include any external dependencies, CDNs, or scripts. Everything must be inside inline <style> and <script> tags.
+    - DO NOT use forbidden APIs: eval, new Function, fetch, XMLHttpRequest, WebSocket, document.cookie, navigator.mediaDevices, or location.replace.
+11. Return Format: Return ONLY a valid JSON object in this format:
 {
-  "title": "Short Fun Title starting with a relevant emoji first (e.g., '🐍 Snake Math Adventure', '🌌 Cosmic Counting', '🐠 Deep Sea Addition')",
+  "title": "Short Fun Title starting with a relevant emoji (e.g., '🐍 Snake Math Adventure')",
   "htmlContent": "HTML source code string here"
 }
-2. The game must be designed specifically for a vertical mobile portrait screen (aspect ratio 9:16 or 3:4) and MUST utilize the full viewport height and width of the sandbox window with ZERO unused white space or empty gaps at the bottom. To guarantee this, the HTML, body, and outer wrap elements must have: 'height: 100%', 'margin: 0', 'padding: 10px', 'box-sizing: border-box', 'display: flex', 'flex-direction: column', and 'justify-content: space-between' or 'space-around'. The main game board / interactive play area (such as balloon popping grids, drop boxes, or sliding canvas) must expand dynamically using 'flex: 1' or 'flex-grow: 1' to occupy all vertical screen height between the header and bottom settings. Never restrict the play board with small fixed heights. Scale buttons, cards, options, and items large to occupy the layout fully.
-3. Use a dyslexia-friendly design: no countdown timers, no negative text (use positive encouragement like "Great try! Let's try again" instead of "Wrong answer"), only positive reinforcement.
-4. The game MUST support rounds and report progress using parent.postMessage:
-   - Action Logging: For every single task or question answered by the student, immediately post a details message to the parent: parent.postMessage({ type: 'game_action', success: true/false, question: 'A brief text of the question (e.g. "3 + 5?")', answer: 'The text of the chosen answer (e.g. "8")' }, '*'). You must report this action details for both correct and incorrect answers.
-   - Rounds Limit: ${rounds === "infinite" ? "Infinite rounds (continuous gameplay). Keep generating new tasks/questions loop endlessly, sending parent.postMessage({ type: 'game_complete', success: true, correctCount: 1, incorrectCount: 0 }, '*') after each correct answer." : `exactly ${rounds} round(s). The game must display round progress clearly on screen (e.g. 'Round 1 of ${rounds}'). ONLY send parent.postMessage({ type: 'game_complete', success: true, correctCount: ${rounds}, incorrectCount: X }, '*') after the user successfully completes the final round.`}
-   - Incorrect answers: parent.postMessage({ type: 'game_attempt', success: false }, '*') after any incorrect attempt.
-5. Do not include external dependencies, CDNs, or scripts. Self-contained HTML, CSS and JS.
-6. The HTML code must not contain any forbidden APIs: eval, new Function, fetch, XMLHttpRequest, WebSocket, document.cookie, navigator.mediaDevices, location.replace, etc.
-7. Return ONLY raw JSON. No markdown backticks or wrapper.
-8. The game layout must NOT be wrapped inside a centered card, bordered box container, or frame that leaves margins or borders on the sides or bottom of the screen. The background and interactive content must span 100% of the screen width and height directly to ensure an immersive full-bleed game display.
-9. The game MUST be highly animated and highly interactive, featuring rich visual effects (such as bouncing items, popping shapes, floating assets, CSS keyframe micro-animations, color gradients, interactive hover/active states, and slide transitions) to captivate the child's attention and keep them actively engaged throughout the play experience.
-10. The game MUST show visual, animated feedback for each task/question outcome: on correct answers, temporarily overlay floating animations with positive texts like "Hurray! 🎉", "Yeahhh! 🌟", or "Awesome! 🎈"; on incorrect attempts, temporarily overlay friendly encouragement like "boo... Try again! 🧸" or "Oops! Keep trying! ❤️". Make sure all overlays are large, colorful, centered, and fully mobile-friendly.`;
+Ensure the "htmlContent" is valid and properly escaped for JSON.`;
 
   if (customInstruction && customInstruction.trim().length > 0) {
     prompt += `\n\nAdditional custom requirements/instructions from the teacher to incorporate: ${customInstruction}`;

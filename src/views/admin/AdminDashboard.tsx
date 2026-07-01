@@ -81,6 +81,7 @@ export const AdminDashboard: React.FC = () => {
   const [gameInstruction, setGameInstruction] = useState("Use space travel theme, include colorful floating planets, count visual stars, astronaut guidance.");
   const [aiTheme, setAiTheme] = useState<"space" | "ocean" | "dino" | "candy" | "custom">("space");
   const [includeSound, setIncludeSound] = useState(true);
+  const [dyslexiaTypography, setDyslexiaTypography] = useState(false);
   const [rounds, setRounds] = useState<number | "infinite">(5);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(false);
@@ -361,11 +362,12 @@ export const AdminDashboard: React.FC = () => {
     const combinedInstructions = [
       `Theme/Style: ${THEME_PRESETS[aiTheme].name}`,
       includeSound ? "Include visual audio feedback using HTML5 Web Audio API (AudioContext synth chimes) for correct and incorrect answers." : "Visual only feedback, do not write audio codes.",
+      dyslexiaTypography ? "Strictly apply dyslexia-friendly typography adjustments: use larger rounded fonts (like Lexend/Outfit or Comic Neue), set letter-spacing to at least 0.12em, line-height to 1.6, bold font-weight, mixed-case text, and reversal prevention underlines." : "Do NOT apply specialized dyslexia-friendly typography styling. Use regular default web typography (standard modern sans-serif fonts, default letter-spacing, normal weight).",
       gameInstruction.trim()
     ].filter(Boolean).join("\n• ");
 
     try {
-      const result = await generateGame(subject, topic, age, difficulty, geminiApiKey, combinedInstructions, rounds);
+      const result = await generateGame(subject, topic, age, difficulty, geminiApiKey, combinedInstructions, rounds, undefined, dyslexiaTypography);
       setGeneratedGame(result);
       setDraftCode(result.htmlContent);
     } catch (err: any) {
@@ -389,19 +391,20 @@ export const AdminDashboard: React.FC = () => {
   };
 
   const handleRegenerate = async () => {
-    if (!tweakInstruction.trim() || !generatedGame) return;
+    if (!tweakInstruction.trim() || !draftCode.trim()) return;
     setIsGenerating(true);
     setGenerationError("");
 
     const modifyInstructions = [
       `Theme/Style: ${THEME_PRESETS[aiTheme].name}`,
       includeSound ? "Include visual audio feedback using HTML5 Web Audio API (AudioContext synth chimes) for correct and incorrect answers." : "Visual only feedback, do not write audio codes.",
+      dyslexiaTypography ? "Strictly apply dyslexia-friendly typography adjustments: use larger rounded fonts (like Lexend/Outfit or Comic Neue), set letter-spacing to at least 0.12em, line-height to 1.6, bold font-weight, mixed-case text, and reversal prevention underlines." : "Do NOT apply specialized dyslexia-friendly typography styling. Use regular default web typography (standard modern sans-serif fonts, default letter-spacing, normal weight).",
       gameInstruction.trim() ? `Base instructions: ${gameInstruction.trim()}` : "",
       `REGENERATION REQUEST: Modify the existing HTML code according to this custom request: "${tweakInstruction.trim()}". Keep the rest of the game structures, logic, and sounds unchanged.`
     ].filter(Boolean).join("\n• ");
 
     try {
-      const result = await generateGame(subject, topic, age, difficulty, geminiApiKey, modifyInstructions, rounds, draftCode);
+      const result = await generateGame(subject, topic, age, difficulty, geminiApiKey, modifyInstructions, rounds, draftCode, dyslexiaTypography);
       setGeneratedGame(result);
       setDraftCode(result.htmlContent);
       setTweakInstruction("");
@@ -441,22 +444,6 @@ export const AdminDashboard: React.FC = () => {
         );
       } catch (notiErr) {
         console.warn("Could not trigger publish notification:", notiErr);
-      }
-
-      // Save game HTML copy to local disk src/game/ folder
-      try {
-        await fetch('/api/save-game', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            title: newGame.title,
-            htmlContent: newGame.htmlContent
-          })
-        });
-      } catch (fileErr) {
-        console.warn("Could not save HTML copy to disk games folder:", fileErr);
       }
 
       alert(editingGameId ? "Game successfully updated! ✏️" : "Game successfully published to students! 🎉");
@@ -1074,6 +1061,20 @@ export const AdminDashboard: React.FC = () => {
               </label>
             </div>
 
+            {/* Dyslexia-Friendly Typograph option */}
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", backgroundColor: "#f8fafc", padding: "12px 18px", borderRadius: "16px", border: "1px solid #cbd5e1" }}>
+              <input
+                id="typography-toggle-studio"
+                type="checkbox"
+                checked={dyslexiaTypography}
+                onChange={e => setDyslexiaTypography(e.target.checked)}
+                style={{ width: "20px", height: "20px", cursor: "pointer" }}
+              />
+              <label htmlFor="typography-toggle-studio" style={{ fontWeight: "700", fontSize: "0.9rem", cursor: "pointer" }}>
+                🔤 Dyslexia-Friendly Typograph (Rounded fonts, increased spacing, reversal cues)
+              </label>
+            </div>
+
             {/* Prompt Preview */}
             <div style={{ padding: "14px", borderRadius: "16px", backgroundColor: "#f0fdfa", border: "1.5px solid #5eead4", fontSize: "0.8rem", display: "flex", flexDirection: "column", gap: "6px" }}>
               <span style={{ fontWeight: "700", color: "#0f766e" }}>💡 Structured Guidelines Sent to AI model:</span>
@@ -1081,6 +1082,7 @@ export const AdminDashboard: React.FC = () => {
                 • Theme/Style: {THEME_PRESETS[aiTheme].name}
                 {"\n"}• Rounds: {rounds === "infinite" ? "Infinite loop of tasks (Continuous Play)" : `${rounds} Round(s) Limit`}
                 {"\n"}• {includeSound ? "Include HTML5 Web Audio synth feedback tone generator." : "Visual only feedback, do not write audio codes."}
+                {"\n"}• Dyslexia Typography: {dyslexiaTypography ? "ENABLED (large spaced rounded fonts, reversal cues)" : "DISABLED (standard font stack)"}
                 {gameInstruction.trim() && `\n• ${gameInstruction.trim()}`}
               </div>
             </div>
