@@ -1185,7 +1185,7 @@ export const Dashboard: React.FC = () => {
                 studentId,
                 studentName,
                 parentPhone,
-                amount: 50,
+                amount: 49,
                 status: "pending",
                 createdAt: new Date().toISOString()
               });
@@ -1193,7 +1193,7 @@ export const Dashboard: React.FC = () => {
               console.error("Failed to create payment record:", err);
             }
 
-            const payUrl = `upi://pay?pa=Q668504716@ybl&am=50&cu=INR&tn=${encodeURIComponent(studentName + " tution Fee")}&tr=${txnId}`;
+            const payUrl = `upi://pay?pa=Q668504716@ybl&am=49&cu=INR&tn=${encodeURIComponent(studentName + " tution Fee")}&tr=${txnId}`;
             window.location.href = payUrl;
           }}
           className="btn"
@@ -1216,7 +1216,7 @@ export const Dashboard: React.FC = () => {
             marginTop: "4px"
           }}
         >
-          <span>💳 Pay Tuition Fee to Extend</span>
+          <span>💳 Pay ₹49/month (Launch Offer)</span>
         </button>
 
         <div style={{ display: "flex", gap: "10px", width: "100%", marginTop: "8px" }}>
