@@ -7,6 +7,7 @@ interface ChunkyButtonProps {
   type?: "button" | "submit" | "reset";
   disabled?: boolean;
   style?: React.CSSProperties;
+  className?: string;
 }
 
 export const ChunkyButton: React.FC<ChunkyButtonProps> = ({
@@ -15,14 +16,15 @@ export const ChunkyButton: React.FC<ChunkyButtonProps> = ({
   onClick,
   type = "button",
   disabled = false,
-  style
+  style,
+  className = ""
 }) => {
   return (
     <button
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`btn btn-${variant}`}
+      className={`btn btn-${variant} ${className}`}
       style={{
         opacity: disabled ? 0.6 : 1,
         cursor: disabled ? "not-allowed" : "pointer",
