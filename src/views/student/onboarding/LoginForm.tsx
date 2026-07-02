@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { AVATARS } from "../../../utils/constants";
 import { ChunkyButton } from "../../../components/ChunkyButton";
-import LocalDB, { Student } from "../../../services/db";
+import LocalDB from "../../../services/db";
+import type { Student } from "../../../services/db";
 
 interface LoginFormProps {
   onSelectStudent: (student: Student) => void;

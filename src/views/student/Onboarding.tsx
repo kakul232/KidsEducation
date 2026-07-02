@@ -9,7 +9,8 @@ import type { Student } from "../../services/db";
 import { PatternLock } from "../../components/PatternLock";
 import { getClientDetails } from "../../utils/device";
 
-import { RegistrationForm, RegistrationData } from "./onboarding/RegistrationForm";
+import { RegistrationForm } from "./onboarding/RegistrationForm";
+import type { RegistrationData } from "./onboarding/RegistrationForm";
 import { LoginForm } from "./onboarding/LoginForm";
 import "./Onboarding.css";
 
