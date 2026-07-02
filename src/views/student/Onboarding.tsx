@@ -94,7 +94,8 @@ export const Onboarding: React.FC = () => {
             patternTargetStudent.age,
             patternTargetStudent.class || "",
             patternTargetStudent.phone || "",
-            pattern
+            pattern,
+            patternTargetStudent.id
           );
         } else if (tempRegistrationData) {
           // Fully new student profile creation
@@ -117,7 +118,8 @@ export const Onboarding: React.FC = () => {
             patternTargetStudent.age,
             patternTargetStudent.class || "",
             patternTargetStudent.phone || "",
-            pattern
+            pattern,
+            patternTargetStudent.id
           );
         }
       }

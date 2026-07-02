@@ -24,7 +24,7 @@ interface AppContextType {
   geminiApiKey: string;
   speakText: (text: string) => void;
   setView: (view: ViewState) => void;
-  setOnboarding: (name: string, avatar: string, age: number | undefined, studentClass: string, phone: string, patternLock?: string) => Promise<void>;
+  setOnboarding: (name: string, avatar: string, age: number | undefined, studentClass: string, phone: string, patternLock?: string, studentId?: string) => Promise<void>;
   setPlayingGame: (game: Game | null) => void;
   updateAccessibility: (config: Partial<AccessibilityConfig>) => void;
   saveApiKey: (key: string) => Promise<void> | void;
@@ -283,7 +283,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const setOnboarding = async (name: string, avatar: string, age: number | undefined, studentClass: string, phone: string, patternLock?: string) => {
+  const setOnboarding = async (name: string, avatar: string, age: number | undefined, studentClass: string, phone: string, patternLock?: string, studentId?: string) => {
     // Collect IP, Device ID, and system metadata
     const details = await getClientDetails();
     
@@ -291,16 +291,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const existingStudents = await LocalDB.getStudents();
     const cleanName = name.trim().toLowerCase();
 
-    // Search for a matching student (case-insensitive name AND either matching deviceId or matching IP)
-    const matchedStudent = existingStudents.find(s => {
-      const sName = s.name.trim().toLowerCase();
-      if (sName !== cleanName) return false;
-      
-      if (s.deviceId && s.deviceId === details.deviceId) return true;
-      if (s.ip && details.ip && s.ip === details.ip) return true;
-      
-      return false;
-    });
+    // Search for a matching student
+    let matchedStudent = studentId ? existingStudents.find(s => s.id === studentId) : undefined;
+    
+    if (!matchedStudent) {
+      matchedStudent = existingStudents.find(s => {
+        const sName = s.name.trim().toLowerCase();
+        if (sName !== cleanName) return false;
+        
+        if (s.deviceId && s.deviceId === details.deviceId) return true;
+        if (s.ip && details.ip && s.ip === details.ip) return true;
+        
+        return false;
+      });
+    }
 
     const validUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
     const createdAt = new Date().toISOString();
