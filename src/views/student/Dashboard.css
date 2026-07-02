@@ -1,0 +1,590 @@
+/* Segmented Tab Controller */
+.tab-controller-container {
+  display: flex;
+  background-color: #f1f5f9;
+  border-radius: 16px;
+  padding: 6px;
+  margin-bottom: 20px;
+  border: 2px solid #cbd5e1;
+}
+
+.tab-controller-btn {
+  flex: 1;
+  padding: 12px 16px;
+  font-size: 1.05rem;
+  font-weight: 800;
+  border-radius: 12px;
+  border: none;
+  background-color: transparent;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.tab-controller-btn.active {
+  background-color: var(--accent-primary);
+  color: #ffffff;
+  box-shadow: 0 4px 6px rgba(79, 70, 229, 0.2);
+}
+
+.tab-controller-badge {
+  background-color: #ef4444;
+  color: #ffffff;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  font-size: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  fontWeight: 900;
+}
+
+/* Games Header */
+.games-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.games-header h3 {
+  font-size: 1.3rem;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.view-mode-btn-group {
+  display: flex;
+  gap: 6px;
+}
+
+.view-mode-btn {
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  border-radius: 10px;
+  border: 2px solid #cbd5e1;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.view-mode-btn.active {
+  background-color: var(--accent-primary);
+  color: #ffffff;
+}
+
+/* Exit Door */
+.exit-door-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 28px;
+  margin-bottom: 10px;
+}
+
+.exit-door-btn {
+  width: 55px;
+  height: 55px;
+  border-radius: 50%;
+  background-color: #fee2e2;
+  border: 4px solid #fca5a5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.7rem;
+  cursor: pointer;
+  box-shadow: 0 6px 0 #ef4444;
+  outline: none;
+}
+
+/* Validity Renew Page */
+.expired-container {
+  justify-content: center;
+  min-height: 100vh;
+  padding: 20px;
+}
+
+.expired-card {
+  max-width: 400px;
+  width: 100%;
+  text-align: center;
+  padding: 40px 24px;
+  border: 4px solid var(--accent-primary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+.expired-icon {
+  font-size: 4.5rem;
+}
+
+.expired-title {
+  font-size: 1.8rem;
+  font-weight: 900;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.expired-desc {
+  color: var(--text-secondary);
+  font-weight: 700;
+  font-size: 1.05rem;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.expired-details {
+  background-color: var(--bg-primary);
+  border: 2px dashed #cbd5e1;
+  border-radius: 16px;
+  padding: 16px;
+  width: 100%;
+  font-size: 0.95rem;
+  text-align: left;
+}
+
+.expired-details p {
+  margin: 4px 0;
+}
+
+.expired-details span {
+  font-family: monospace;
+}
+
+.expired-logout-btn {
+  width: 100%;
+  padding: 12px;
+  font-size: 1rem;
+  background-color: #fee2e2;
+  border: 2px solid #fca5a5;
+  color: #b91c1c;
+  border-radius: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+/* Exit Confirmation Modal */
+.exit-modal-icon {
+  font-size: 3.5rem;
+  animation: bounce 2s infinite;
+}
+
+.exit-modal-title {
+  font-size: 1.45rem;
+  font-weight: 900;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.exit-modal-desc {
+  color: var(--text-secondary);
+  font-weight: 700;
+  font-size: 0.95rem;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.exit-modal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.exit-modal-keep-btn {
+  width: 100%;
+  padding: 14px;
+  font-size: 1.1rem;
+  font-weight: 800;
+  box-shadow: 0 4px 0 #16a34a;
+}
+
+.exit-modal-yes-btn {
+  width: 100%;
+  padding: 10px;
+  font-size: 0.85rem;
+  background-color: #fee2e2;
+  border: 2px solid #fca5a5;
+  color: #b91c1c;
+  border-radius: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  margin-top: 8px;
+}
+
+/* Request Game Idea Modal */
+.idea-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2.5px dashed #cbd5e1;
+  padding-bottom: 12px;
+  width: 100%;
+}
+
+.idea-modal-title {
+  font-size: 1.3rem;
+  font-weight: 900;
+  color: var(--text-primary);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.idea-modal-close {
+  background: none;
+  border: none;
+  font-size: 1.8rem;
+  cursor: pointer;
+  font-weight: 900;
+  color: var(--text-secondary);
+}
+
+.idea-modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.idea-modal-desc {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: left;
+}
+
+.idea-modal-textarea {
+  width: 100%;
+  padding: 16px;
+  border-radius: 16px;
+  border: 2px solid #cbd5e1;
+  font-size: 0.95rem;
+  font-family: inherit;
+  resize: none;
+  box-sizing: border-box;
+  background-color: var(--bg-primary);
+}
+
+.idea-modal-textarea:focus {
+  border-color: var(--accent-secondary);
+  outline: none;
+}
+
+.idea-modal-actions {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+
+.idea-modal-cancel {
+  flex: 1;
+  padding: 12px;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.idea-modal-submit {
+  flex: 1;
+  padding: 12px;
+  font-size: 0.95rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 4px 0 var(--accent-secondary);
+}
+
+/* Success Idea Modal */
+.success-modal-icon {
+  font-size: 3.5rem;
+  animation: kids-bounce 2s infinite ease-in-out;
+}
+
+.success-modal-title {
+  font-size: 1.4rem;
+  font-weight: 900;
+  color: #065f46;
+  margin: 0;
+}
+
+.success-modal-desc {
+  color: var(--text-secondary);
+  font-weight: 700;
+  font-size: 0.95rem;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.success-modal-btn {
+  width: 100%;
+  padding: 14px;
+  font-size: 1.05rem;
+  font-weight: 800;
+  box-shadow: 0 4px 0 #16a34a;
+}
+
+/* Premium Locked Game Modal */
+.lock-modal-icon {
+  font-size: 3.5rem;
+  animation: kids-wiggle 2s infinite ease-in-out;
+}
+
+.lock-modal-title-stars {
+  font-size: 1.45rem;
+  font-weight: 900;
+  color: #b45309;
+  margin: 0;
+}
+
+.lock-modal-title-premium {
+  font-size: 1.45rem;
+  font-weight: 900;
+  color: #b91c1c;
+  margin: 0;
+}
+
+.lock-modal-desc {
+  color: var(--text-secondary);
+  font-weight: 700;
+  font-size: 0.95rem;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.lock-modal-btn {
+  width: 100%;
+  padding: 14px;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #ffffff;
+  border-style: solid;
+  border-width: 2px;
+  border-radius: 20px;
+}
+
+.lock-btn-stars {
+  background-color: #d97706;
+  border-color: #b45309;
+  box-shadow: 0 4px 0 #b45309;
+}
+
+.lock-btn-premium {
+  background-color: #ef4444;
+  border-color: #dc2626;
+  box-shadow: 0 4px 0 #dc2626;
+}
+
+/* Flex Modal */
+.flex-modal-title {
+  margin: 0 0 10px 0;
+  font-size: 1.3rem;
+  font-weight: 900;
+}
+
+.flex-modal-desc {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0 0 20px 0;
+}
+
+.flex-modal-empty {
+  font-style: italic;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-bottom: 20px;
+}
+
+.flex-modal-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 20px;
+  width: 100%;
+}
+
+.flex-modal-btn {
+  padding: 10px;
+  font-size: 0.95rem;
+  font-weight: 800;
+  width: 100%;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.flex-modal-close {
+  width: 100%;
+  padding: 12px;
+  font-weight: 800;
+}
+
+/* Challenge Modal */
+.challenge-modal-title {
+  margin: 0 0 10px 0;
+  font-size: 1.3rem;
+  font-weight: 900;
+}
+
+.challenge-modal-desc {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0 0 20px 0;
+}
+
+.challenge-modal-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 250px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 20px;
+  width: 100%;
+}
+
+.challenge-modal-btn {
+  padding: 10px;
+  font-size: 0.95rem;
+  font-weight: 800;
+  width: 100%;
+  text-align: left;
+}
+
+.challenge-modal-close {
+  width: 100%;
+  padding: 12px;
+  font-weight: 800;
+}
+
+/* Frog Upgrade Modal */
+.frog-modal {
+  box-shadow: 0 12px 24px rgba(34, 197, 94, 0.15);
+}
+
+.frog-modal-icon {
+  font-size: 4.5rem;
+  animation: kids-wiggle 2s infinite ease-in-out;
+}
+
+.frog-modal-title {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 900;
+  color: #166534;
+}
+
+.frog-modal-desc {
+  color: #1b6535;
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.frog-modal-call {
+  width: 100%;
+  padding: 14px;
+  font-size: 1.1rem;
+  font-weight: 900;
+  background-color: #22c55e;
+  border-color: #16a34a;
+  color: #ffffff;
+  border-radius: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 4px 0 #16a34a;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.frog-modal-pay {
+  width: 100%;
+  padding: 14px;
+  font-size: 1.1rem;
+  font-weight: 900;
+  background-color: #4f46e5;
+  border-color: #4338ca;
+  color: #ffffff;
+  border-radius: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 4px 0 #4338ca;
+  border: none;
+  cursor: pointer;
+  margin-top: 4px;
+}
+
+.frog-modal-close {
+  width: 100%;
+  padding: 12px;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+/* Free Trial Modal */
+.trial-modal {
+  box-shadow: 0 12px 24px rgba(59, 130, 246, 0.2);
+}
+
+.trial-modal-icon {
+  font-size: 4.5rem;
+  animation: bounce 2s infinite;
+}
+
+.trial-modal-title {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 900;
+  color: #1e3a8a;
+}
+
+.trial-modal-desc {
+  color: #1e40af;
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.trial-modal-start {
+  width: 100%;
+  padding: 16px;
+  font-size: 1.15rem;
+  font-weight: 900;
+  background-color: #22c55e;
+  border-color: #16a34a;
+  color: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 4px 0 #16a34a;
+  cursor: pointer;
+  border: none;
+}
+
+.trial-modal-close {
+  width: 100%;
+  padding: 10px;
+  font-size: 0.9rem;
+  font-weight: 800;
+}

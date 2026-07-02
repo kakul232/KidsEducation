@@ -16,6 +16,7 @@ interface KidsModalProps {
   textAlign?: "center" | "left" | "right" | "inherit";
   gap?: string;
   style?: React.CSSProperties;
+  className?: string;
 }
 
 export const KidsModal: React.FC<KidsModalProps> = ({
@@ -32,7 +33,8 @@ export const KidsModal: React.FC<KidsModalProps> = ({
   padding = "28px 24px",
   textAlign = "center",
   gap = "20px",
-  style = {}
+  style = {},
+  className = ""
 }) => {
   const modalRef = useRef<HTMLDivElement>(null);
 
@@ -101,7 +103,7 @@ export const KidsModal: React.FC<KidsModalProps> = ({
         }}
       >
         <PlayCard
-          className="animate-pop-in"
+          className={`animate-pop-in ${className}`}
           style={{
             width: "100%",
             maxHeight: "calc(100vh - 80px)",

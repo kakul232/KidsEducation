@@ -2,16 +2,25 @@ import React, { useState, useEffect } from "react";
 import { useApp } from "../../context/AppContext";
 import LocalDB from "../../services/db";
 import type { Game, ActivityLog, FriendRequest, Student, Challenge } from "../../services/db";
-import { Send } from "lucide-react";
-import { AvatarIcon } from "../../components/AvatarIcon";
-import { PlayCard } from "../../components/PlayCard";
-import { KidsModal } from "../../components/KidsModal";
 import KidsLoader from "../../components/KidsLoader";
 import { StudentHeader } from "../../components/student/StudentHeader";
 import { PWABanners } from "../../components/student/PWABanners";
 import { SubjectSelector } from "../../components/student/SubjectSelector";
 import { GameList } from "../../components/student/GameList";
 import { FriendsHub } from "../../components/student/FriendsHub";
+
+// Import extracted subcomponents
+import { ValidityExpiredView } from "./dashboard/ValidityExpiredView";
+import { ExitConfirmModal } from "./dashboard/ExitConfirmModal";
+import { RequestIdeaModal } from "./dashboard/RequestIdeaModal";
+import { IdeaSuccessModal } from "./dashboard/IdeaSuccessModal";
+import { LockModal } from "./dashboard/LockModal";
+import { FlexModal } from "./dashboard/FlexModal";
+import { ChallengeModal } from "./dashboard/ChallengeModal";
+import { FrogModal } from "./dashboard/FrogModal";
+import { TrialPopupModal } from "./dashboard/TrialPopupModal";
+
+import "./Dashboard.css";
 
 const DIFFICULTY_SYMBOLS: Record<string, { symbol: string; label: string; color: string; bg: string }> = {
   Easy: { symbol: "🌱", label: "Seedling", color: "#15803d", bg: "#d1fae5" },
@@ -39,7 +48,7 @@ const isPremium = (student: Student | null) => {
 };
 
 export const Dashboard: React.FC = () => {
-  const { currentStudent, updateStudent, setPlayingGame, installPrompt, triggerInstall, notiPermission, requestNotiPermission, speakText } = useApp();
+  const { currentStudent, setPlayingGame, installPrompt, triggerInstall, notiPermission, requestNotiPermission, speakText } = useApp();
   const [games, setGames] = useState<Game[]>([]);
   const [selectedSubject, setSelectedSubject] = useState("math");
   const [completedGames, setCompletedGames] = useState<Record<string, string>>({});
@@ -50,8 +59,6 @@ export const Dashboard: React.FC = () => {
 
   // Modals & game requests states
   const [showRequestModal, setShowRequestModal] = useState(false);
-  const [requestIdeaText, setRequestIdeaText] = useState("");
-  const [isSubmittingIdea, setIsSubmittingIdea] = useState(false);
   const [showLockModal, setShowLockModal] = useState(false);
   const [lockedGameTitle, setLockedGameTitle] = useState("");
   const [lockedReason, setLockedReason] = useState<"premium" | "stars">("premium");
@@ -85,26 +92,6 @@ export const Dashboard: React.FC = () => {
       speakText(`Hi ${currentStudent.name}! You have a free 7-day premium trial waiting for you! Tap to activate!`);
     }
   }, [currentStudent]);
-
-  const handleActivateTrial = async () => {
-    if (!currentStudent) return;
-    try {
-      const trialUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-      const updated: Student = {
-        ...currentStudent,
-        trialUntil
-      };
-      await updateStudent(updated);
-      setShowTrialPopup(false);
-      speakText("Hooray! Your 7-day premium trial is now active! Go explore challenges and friends progress!");
-      setSocialSuccess("Hooray! Premium Trial Activated for 7 days! 💎");
-      setTimeout(() => setSocialSuccess(""), 4000);
-      fetchSocialData();
-    } catch (err) {
-      console.error("Failed to activate trial:", err);
-      setSocialError("Failed to activate trial. Please try again.");
-    }
-  };
 
   const fetchSocialData = async () => {
     if (!currentStudent) return;
@@ -276,66 +263,6 @@ export const Dashboard: React.FC = () => {
     }
   };
 
-  const handleFlexScore = async (friendId: string, friendName: string) => {
-    if (!currentStudent || !activeFlexGame) return;
-    try {
-      const flexId = "flex_" + Math.random().toString(36).substr(2, 9);
-      const flex: Challenge = {
-        id: flexId,
-        type: "flex",
-        senderId: currentStudent.id,
-        senderName: currentStudent.name,
-        receiverId: friendId,
-        receiverName: friendName,
-        gameId: activeFlexGame.gameId,
-        gameTitle: activeFlexGame.title,
-        senderScore: activeFlexGame.score,
-        status: "pending",
-        createdAt: new Date().toISOString()
-      };
-      await LocalDB.sendChallenge(flex);
-      setSocialSuccess(`Flexed your score of ${activeFlexGame.score} in ${activeFlexGame.title} with ${friendName}! 💪`);
-      speakText(`Flexed your score with ${friendName}!`);
-      setShowFlexModal(false);
-      fetchSocialData();
-    } catch (err) {
-      console.error("Failed to flex score:", err);
-      setSocialError("Failed to flex score with friend.");
-    }
-  };
-
-  const handleSendChallenge = async (gameId: string, gameTitle: string) => {
-    if (!currentStudent || !activeChallengeFriend) return;
-
-    // Find own highscore
-    const ownScore = myHighscores.find(hs => hs.gameId === gameId)?.maxCorrect || 0;
-
-    try {
-      const challengeId = "chall_" + Math.random().toString(36).substr(2, 9);
-      const challenge: Challenge = {
-        id: challengeId,
-        type: "challenge",
-        senderId: currentStudent.id,
-        senderName: currentStudent.name,
-        receiverId: activeChallengeFriend.id,
-        receiverName: activeChallengeFriend.name,
-        gameId,
-        gameTitle,
-        senderScore: ownScore,
-        status: "pending",
-        createdAt: new Date().toISOString()
-      };
-      await LocalDB.sendChallenge(challenge);
-      setSocialSuccess(`Challenged ${activeChallengeFriend.name} to play ${gameTitle}! ⚔️`);
-      speakText(`Challenged ${activeChallengeFriend.name} to a game!`);
-      setShowChallengeModal(false);
-      fetchSocialData();
-    } catch (err) {
-      console.error("Failed to send challenge:", err);
-      setSocialError("Failed to send challenge to friend.");
-    }
-  };
-
   const handlePlayChallenge = (challenge: Challenge) => {
     const game = games.find(g => g.id === challenge.gameId);
     if (!game) {
@@ -357,8 +284,6 @@ export const Dashboard: React.FC = () => {
       console.error("Failed to clear notification:", err);
     }
   };
-
-
 
   useEffect(() => {
     // 1. Helper to render games & logs from a given data set
@@ -510,42 +435,6 @@ export const Dashboard: React.FC = () => {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-
-
-  const handleStudentLogOut = () => {
-    localStorage.removeItem("active_student_id");
-    // Reload page or update view to reset state
-    window.location.reload();
-  };
-
-  const handleSubmitIdea = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!requestIdeaText.trim()) return;
-
-    setIsSubmittingIdea(true);
-    try {
-      const ideaId = "req_" + Date.now();
-      const newRequest = {
-        id: ideaId,
-        studentId: currentStudent?.id || "guest",
-        studentName: currentStudent?.name || "Guest Student",
-        idea: requestIdeaText.trim(),
-        createdAt: new Date().toISOString()
-      };
-
-      await LocalDB.saveGameRequest(newRequest);
-      speakText("Idea sent! Thank you for sharing your suggestion!");
-      setRequestIdeaText("");
-      setShowRequestModal(false);
-      setShowIdeaSuccess(true);
-    } catch (err) {
-      console.error("Failed to save student request:", err);
-      alert("Oops! Failed to submit your idea. Try again!");
-    } finally {
-      setIsSubmittingIdea(false);
-    }
-  };
-
   const isNew = (createdAtString?: string) => {
     if (!createdAtString) return false;
     try {
@@ -563,63 +452,9 @@ export const Dashboard: React.FC = () => {
 
   if (isExpired && currentStudent) {
     return (
-      <div className="container animate-slide-up" style={{ justifyContent: "center", minHeight: "100vh", padding: "20px" }}>
-        <PlayCard
-          style={{
-            maxWidth: "400px",
-            width: "100%",
-            textAlign: "center",
-            padding: "40px 24px",
-            border: "4px solid var(--accent-primary)",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: "24px"
-          }}
-        >
-          <div style={{ fontSize: "4.5rem" }}>⏰</div>
-          <h2 style={{ fontSize: "1.8rem", fontWeight: "900", color: "var(--text-primary)", margin: 0 }}>
-            Time to Renew! 🌟
-          </h2>
-          <p style={{ color: "var(--text-secondary)", fontWeight: "700", fontSize: "1.05rem", margin: 0, lineHeight: "1.5" }}>
-            Hi {currentStudent.name}! Your learning dashboard validity has ended.
-            Please ask your parents or teacher to renew it so you can keep playing and earning stars!
-          </p>
-
-          <div
-            style={{
-              backgroundColor: "var(--bg-primary)",
-              border: "2px dashed #cbd5e1",
-              borderRadius: "16px",
-              padding: "16px",
-              width: "100%",
-              fontSize: "0.95rem",
-              textAlign: "left"
-            }}
-          >
-            <p style={{ margin: "4px 0" }}><strong>Registered Phone:</strong> {currentStudent.phone || "N/A"}</p>
-            <p style={{ margin: "4px 0" }}><strong>Student ID:</strong> <span style={{ fontFamily: "monospace" }}>{currentStudent.id}</span></p>
-          </div>
-
-          <button
-            onClick={handleStudentLogOut}
-            className="btn"
-            style={{
-              width: "100%",
-              padding: "12px",
-              fontSize: "1rem",
-              backgroundColor: "#fee2e2",
-              border: "2px solid #fca5a5",
-              color: "#b91c1c",
-              borderRadius: "12px",
-              fontWeight: "800",
-              cursor: "pointer"
-            }}
-          >
-            🚪 Change Account
-          </button>
-        </PlayCard>
-      </div>
+      <ValidityExpiredView
+        currentStudent={currentStudent}
+      />
     );
   }
 
@@ -633,70 +468,20 @@ export const Dashboard: React.FC = () => {
       <StudentHeader currentStudent={currentStudent} isPremium={isPremium} />
 
       {/* Segmented Tab Controller for Games vs Friends */}
-      <div
-        style={{
-          display: "flex",
-          backgroundColor: "#f1f5f9",
-          borderRadius: "16px",
-          padding: "6px",
-          marginBottom: "20px",
-          border: "2px solid #cbd5e1"
-        }}
-      >
+      <div className="tab-controller-container">
         <button
           onClick={() => setActiveTab("games")}
-          style={{
-            flex: 1,
-            padding: "12px 16px",
-            fontSize: "1.05rem",
-            fontWeight: "800",
-            borderRadius: "12px",
-            border: "none",
-            backgroundColor: activeTab === "games" ? "var(--accent-primary)" : "transparent",
-            color: activeTab === "games" ? "#ffffff" : "#475569",
-            cursor: "pointer",
-            transition: "all 0.2s ease",
-            boxShadow: activeTab === "games" ? "0 4px 6px rgba(79, 70, 229, 0.2)" : "none"
-          }}
+          className={`tab-controller-btn ${activeTab === "games" ? "active" : ""}`}
         >
           🎮 Play Games
         </button>
         <button
           onClick={() => setActiveTab("friends")}
-          style={{
-            flex: 1,
-            padding: "12px 16px",
-            fontSize: "1.05rem",
-            fontWeight: "800",
-            borderRadius: "12px",
-            border: "none",
-            backgroundColor: activeTab === "friends" ? "var(--accent-primary)" : "transparent",
-            color: activeTab === "friends" ? "#ffffff" : "#475569",
-            cursor: "pointer",
-            transition: "all 0.2s ease",
-            boxShadow: activeTab === "friends" ? "0 4px 6px rgba(79, 70, 229, 0.2)" : "none",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "6px"
-          }}
+          className={`tab-controller-btn ${activeTab === "friends" ? "active" : ""}`}
         >
           <span>🤝 Friends Hub</span>
           {friendRequests.filter(r => r.receiverId === currentStudent?.id && r.status === "pending").length > 0 && (
-            <span
-              style={{
-                backgroundColor: "#ef4444",
-                color: "#ffffff",
-                borderRadius: "50%",
-                width: "20px",
-                height: "20px",
-                fontSize: "0.75rem",
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontWeight: "900"
-              }}
-            >
+            <span className="tab-controller-badge">
               {friendRequests.filter(r => r.receiverId === currentStudent?.id && r.status === "pending").length}
             </span>
           )}
@@ -717,38 +502,18 @@ export const Dashboard: React.FC = () => {
             setSelectedSubject={setSelectedSubject}
           />
 
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-            <h3 style={{ fontSize: "1.3rem", color: "var(--text-primary)", margin: 0 }}>
-              Choose a Game:
-            </h3>
-            <div style={{ display: "flex", gap: "6px" }}>
+          <div className="games-header">
+            <h3>Choose a Game:</h3>
+            <div className="view-mode-btn-group">
               <button
                 onClick={() => setViewMode("list")}
-                style={{
-                  padding: "6px 12px",
-                  fontSize: "0.8rem",
-                  borderRadius: "10px",
-                  border: "2px solid #cbd5e1",
-                  backgroundColor: viewMode === "list" ? "var(--accent-primary)" : "var(--bg-secondary)",
-                  color: viewMode === "list" ? "#ffffff" : "var(--text-primary)",
-                  fontWeight: "800",
-                  cursor: "pointer"
-                }}
+                className={`view-mode-btn ${viewMode === "list" ? "active" : ""}`}
               >
                 📋 List
               </button>
               <button
                 onClick={() => setViewMode("grid")}
-                style={{
-                  padding: "6px 12px",
-                  fontSize: "0.8rem",
-                  borderRadius: "10px",
-                  border: "2px solid #cbd5e1",
-                  backgroundColor: viewMode === "grid" ? "var(--accent-primary)" : "var(--bg-secondary)",
-                  color: viewMode === "grid" ? "#ffffff" : "var(--text-primary)",
-                  fontWeight: "800",
-                  cursor: "pointer"
-                }}
+                className={`view-mode-btn ${viewMode === "grid" ? "active" : ""}`}
               >
                 🎛️ Grid
               </button>
@@ -809,23 +574,10 @@ export const Dashboard: React.FC = () => {
       )}
 
       {/* Exit Dashboard using kids-friendly exit door */}
-      <div style={{ display: "flex", justifyContent: "center", marginTop: "28px", marginBottom: "10px" }}>
+      <div className="exit-door-container">
         <button
           onClick={() => setShowExitConfirm(true)}
-          style={{
-            width: "55px",
-            height: "55px",
-            borderRadius: "50%",
-            backgroundColor: "#fee2e2",
-            border: "4px solid #fca5a5",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: "1.7rem",
-            cursor: "pointer",
-            boxShadow: "0 6px 0 #ef4444",
-            outline: "none"
-          }}
+          className="exit-door-btn"
           title="Exit Account"
         >
           🚪
@@ -833,465 +585,90 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {/* Accidental Log-out protection modal */}
-      <KidsModal
+      <ExitConfirmModal
         isOpen={showExitConfirm}
         onClose={() => setShowExitConfirm(false)}
-        zIndex={1000}
-        maxWidth="350px"
-      >
-        <div style={{ fontSize: "3.5rem", animation: "bounce 2s infinite" }}>🚪</div>
-        <h3 style={{ fontSize: "1.45rem", fontWeight: "900", color: "var(--text-primary)", margin: 0 }}>
-          Are you leaving?
-        </h3>
-        <p style={{ color: "var(--text-secondary)", fontWeight: "700", fontSize: "0.95rem", margin: 0, lineHeight: "1.4" }}>
-          Do you really want to close your dashboard and exit?
-        </p>
-        <div style={{ display: "flex", flexDirection: "column", gap: "10px", width: "100%" }}>
-          <button
-            autoFocus
-            onClick={() => setShowExitConfirm(false)}
-            className="btn btn-success"
-            style={{ width: "100%", padding: "14px", fontSize: "1.1rem", fontWeight: "800", boxShadow: "0 4px 0 #16a34a" }}
-          >
-            🎮 Keep Playing!
-          </button>
-          <button
-            onClick={handleStudentLogOut}
-            style={{
-              width: "100%",
-              padding: "10px",
-              fontSize: "0.85rem",
-              backgroundColor: "#fee2e2",
-              border: "2px solid #fca5a5",
-              color: "#b91c1c",
-              borderRadius: "12px",
-              fontWeight: "800",
-              cursor: "pointer",
-              marginTop: "8px"
-            }}
-          >
-            🚪 Yes, Exit
-          </button>
-        </div>
-      </KidsModal>
+      />
 
       {/* 1. Request Game Idea Modal */}
-      <KidsModal
+      <RequestIdeaModal
         isOpen={showRequestModal}
         onClose={() => setShowRequestModal(false)}
-        maxWidth="420px"
-        padding="24px"
-      >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "2.5px dashed #cbd5e1", paddingBottom: "12px", width: "100%" }}>
-          <h3 style={{ fontSize: "1.3rem", fontWeight: "900", color: "var(--text-primary)", margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
-            <span>💡 Shared Idea Studio</span>
-          </h3>
-          <button
-            onClick={() => setShowRequestModal(false)}
-            style={{
-              background: "none",
-              border: "none",
-              fontSize: "1.8rem",
-              cursor: "pointer",
-              fontWeight: "900",
-              color: "var(--text-secondary)"
-            }}
-          >
-            ×
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmitIdea} style={{ display: "flex", flexDirection: "column", gap: "16px", width: "100%" }}>
-          <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: "0.95rem", fontWeight: "600", lineHeight: "1.4", textAlign: "left" }}>
-            What kind of game do you want to play? Write or describe your game idea below:
-          </p>
-
-          <textarea
-            autoFocus
-            value={requestIdeaText}
-            onChange={(e) => setRequestIdeaText(e.target.value)}
-            placeholder="E.g., 'I want a balloon counting game with cute dinosaurs!' or 'A puzzle game where I match shapes!'"
-            rows={4}
-            required
-            style={{
-              width: "100%",
-              padding: "16px",
-              borderRadius: "16px",
-              border: "2px solid #cbd5e1",
-              fontSize: "0.95rem",
-              fontFamily: "inherit",
-              resize: "none",
-              boxSizing: "border-box",
-              backgroundColor: "var(--bg-primary)"
-            }}
-          />
-
-          <div style={{ display: "flex", gap: "10px", width: "100%" }}>
-            <button
-              type="button"
-              onClick={() => setShowRequestModal(false)}
-              className="btn btn-gray"
-              style={{ flex: 1, padding: "12px", fontSize: "0.95rem", fontWeight: "800" }}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmittingIdea}
-              className="btn btn-primary"
-              style={{
-                flex: 1,
-                padding: "12px",
-                fontSize: "0.95rem",
-                fontWeight: "800",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "8px",
-                boxShadow: "0 4px 0 var(--accent-secondary)"
-              }}
-            >
-              <Send size={16} fill="white" />
-              <span>{isSubmittingIdea ? "Sending..." : "Send Idea! 🚀"}</span>
-            </button>
-          </div>
-        </form>
-      </KidsModal>
+        onSuccess={() => setShowIdeaSuccess(true)}
+      />
 
       {/* 2. Idea Success Confetti Popup */}
-      <KidsModal
+      <IdeaSuccessModal
         isOpen={showIdeaSuccess}
         onClose={() => setShowIdeaSuccess(false)}
-        borderColor="#10b981"
-        maxWidth="360px"
-      >
-        <div style={{ fontSize: "3.5rem", animation: "kids-bounce 2s infinite ease-in-out" }}>🎉</div>
-        <h3 style={{ fontSize: "1.4rem", fontWeight: "900", color: "#065f46", margin: 0 }}>
-          Idea Sent! Yay!
-        </h3>
-        <p style={{ color: "var(--text-secondary)", fontWeight: "700", fontSize: "0.95rem", margin: 0, lineHeight: "1.4" }}>
-          Your game suggestion was sent straight to your teacher! Keep checking your dashboard for new games!
-        </p>
-        <button
-          autoFocus
-          onClick={() => setShowIdeaSuccess(false)}
-          className="btn btn-success"
-          style={{ width: "100%", padding: "14px", fontSize: "1.05rem", fontWeight: "800", boxShadow: "0 4px 0 #16a34a" }}
-        >
-          Okay! 🎈
-        </button>
-      </KidsModal>
+      />
 
       {/* 3. Premium Locked Game Dialog */}
-      <KidsModal
+      <LockModal
         isOpen={showLockModal}
         onClose={() => setShowLockModal(false)}
-        borderColor="#ef4444"
-        maxWidth="360px"
-      >
-        <div style={{ fontSize: "3.5rem", animation: "kids-wiggle 2s infinite ease-in-out" }}>
-          {lockedReason === "stars" ? "⭐" : "🔒"}
-        </div>
-        <h3 style={{ fontSize: "1.45rem", fontWeight: "900", color: lockedReason === "stars" ? "#b45309" : "#b91c1c", margin: 0 }}>
-          {lockedReason === "stars" ? "Stars Required!" : "Premium Game!"}
-        </h3>
-        <p style={{ color: "var(--text-secondary)", fontWeight: "700", fontSize: "0.95rem", margin: 0, lineHeight: "1.4" }}>
-          {lockedReason === "stars" ? (
-            <span>
-              You need <strong>{lockedStarsRequired.toLocaleString()}</strong> Stars to unlock "{lockedGameTitle}".<br />
-              You currently have <strong>{currentStudent?.stars || 0}</strong> stars. Keep playing to collect more! 🎈
-            </span>
-          ) : (
-            <span>
-              "{lockedGameTitle}" is a premium quest. Please ask your parent or teacher to unlock it for you!
-            </span>
-          )}
-        </p>
-        <button
-          autoFocus
-          onClick={() => setShowLockModal(false)}
-          className="btn btn-danger"
-          style={{
-            width: "100%",
-            padding: "14px",
-            fontSize: "1.05rem",
-            fontWeight: "800",
-            backgroundColor: lockedReason === "stars" ? "#d97706" : "#ef4444",
-            borderColor: lockedReason === "stars" ? "#b45309" : "#dc2626",
-            color: "#ffffff",
-            boxShadow: `0 4px 0 ${lockedReason === "stars" ? "#b45309" : "#dc2626"}`
-          }}
-        >
-          {lockedReason === "stars" ? "Okay! 🎮" : "Go Back"}
-        </button>
-      </KidsModal>
+        gameTitle={lockedGameTitle}
+        reason={lockedReason}
+        starsRequired={lockedStarsRequired}
+      />
 
       {/* 4. Flex selector Modal */}
-      <KidsModal
-        isOpen={showFlexModal && !!activeFlexGame}
+      <FlexModal
+        isOpen={showFlexModal}
         onClose={() => setShowFlexModal(false)}
-        maxWidth="360px"
-        padding="24px"
-      >
-        <h3 style={{ margin: "0 0 10px 0", fontSize: "1.3rem", fontWeight: "900" }}>
-          💪 Flex Your Score!
-        </h3>
-        <p style={{ color: "var(--text-secondary)", fontSize: "0.95rem", fontWeight: "600", margin: "0 0 20px 0" }}>
-          Flex your score of <strong>{activeFlexGame?.score}</strong> in <strong>{activeFlexGame?.title}</strong> on a friend:
-        </p>
-
-        {friendsList.length === 0 ? (
-          <p style={{ fontStyle: "italic", fontSize: "0.9rem", color: "var(--text-secondary)", marginBottom: "20px" }}>
-            Add some friends first to flex your scores!
-          </p>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "200px", overflowY: "auto", WebkitOverflowScrolling: "touch", marginBottom: "20px", width: "100%" }}>
-            {friendsList.map(friend => (
-              <button
-                key={friend.id}
-                onClick={() => handleFlexScore(friend.id, friend.name)}
-                className="btn btn-gray"
-                style={{
-                  padding: "10px",
-                  fontSize: "0.95rem",
-                  fontWeight: "800",
-                  width: "100%",
-                  textAlign: "left",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px"
-                }}
-              >
-                <AvatarIcon avatarId={friend.avatar} size="sm" />
-                <span>Flex with {friend.name}</span>
-              </button>
-            ))}
-          </div>
-        )}
-
-        <button
-          autoFocus
-          onClick={() => setShowFlexModal(false)}
-          className="btn btn-gray"
-          style={{ width: "100%", padding: "12px", fontWeight: "800" }}
-        >
-          Close
-        </button>
-      </KidsModal>
+        activeFlexGame={activeFlexGame}
+        friendsList={friendsList}
+        onSuccess={(msg) => {
+          setSocialSuccess(msg);
+          setTimeout(() => setSocialSuccess(""), 4000);
+          fetchSocialData();
+        }}
+        onError={(msg) => {
+          setSocialError(msg);
+          setTimeout(() => setSocialError(""), 4000);
+        }}
+      />
 
       {/* 5. Challenge Game selector Modal */}
-      <KidsModal
-        isOpen={showChallengeModal && !!activeChallengeFriend}
+      <ChallengeModal
+        isOpen={showChallengeModal}
         onClose={() => setShowChallengeModal(false)}
-        maxWidth="360px"
-        padding="24px"
-      >
-        <h3 style={{ margin: "0 0 10px 0", fontSize: "1.3rem", fontWeight: "900" }}>
-          ⚔️ Challenge {activeChallengeFriend?.name}!
-        </h3>
-        <p style={{ color: "var(--text-secondary)", fontSize: "0.95rem", fontWeight: "600", margin: "0 0 20px 0" }}>
-          Select a game to challenge them:
-        </p>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "250px", overflowY: "auto", WebkitOverflowScrolling: "touch", marginBottom: "20px", width: "100%" }}>
-          {games.map(game => (
-            <button
-              key={game.id}
-              onClick={() => handleSendChallenge(game.id, game.title)}
-              className="btn btn-gray"
-              style={{
-                padding: "10px",
-                fontSize: "0.95rem",
-                fontWeight: "800",
-                width: "100%",
-                textAlign: "left"
-              }}
-            >
-              {game.title}
-            </button>
-          ))}
-        </div>
-
-        <button
-          autoFocus
-          onClick={() => setShowChallengeModal(false)}
-          className="btn btn-gray"
-          style={{ width: "100%", padding: "12px", fontWeight: "800" }}
-        >
-          Cancel
-        </button>
-      </KidsModal>
+        activeChallengeFriend={activeChallengeFriend}
+        games={games}
+        myHighscores={myHighscores}
+        onSuccess={(msg) => {
+          setSocialSuccess(msg);
+          setTimeout(() => setSocialSuccess(""), 4000);
+          fetchSocialData();
+        }}
+        onError={(msg) => {
+          setSocialError(msg);
+          setTimeout(() => setSocialError(""), 4000);
+        }}
+      />
 
       {/* 6. Frog Uncle Premium Upgrade Modal */}
-      <KidsModal
+      <FrogModal
         isOpen={showFrogModal}
         onClose={() => setShowFrogModal(false)}
-        backgroundColor="#f0fdf4"
-        borderColor="#22c55e"
-        maxWidth="380px"
-        padding="28px 24px"
-        gap="16px"
-        style={{ boxShadow: "0 12px 24px rgba(34, 197, 94, 0.15)" }}
-      >
-        <div style={{ fontSize: "4.5rem", animation: "kids-wiggle 2s infinite ease-in-out" }}>🐸</div>
-
-        <h3 style={{ margin: 0, fontSize: "1.6rem", fontWeight: "900", color: "#166534" }}>
-          Frog Uncle's Magic! ✨
-        </h3>
-
-        <p style={{ color: "#1b6535", fontSize: "1.05rem", fontWeight: "700", margin: 0, lineHeight: "1.5" }}>
-          Want to unlock Premium and play games with your friends? <br />
-          Ask your parent to call <strong>Frog Uncle</strong>! 📞
-        </p>
-
-        <a
-          autoFocus
-          href="tel:+919871229599"
-          className="btn btn-success"
-          style={{
-            width: "100%",
-            padding: "14px",
-            fontSize: "1.1rem",
-            fontWeight: "900",
-            backgroundColor: "#22c55e",
-            borderColor: "#16a34a",
-            color: "#ffffff",
-            borderRadius: "16px",
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "8px",
-            boxShadow: "0 4px 0 #16a34a",
-            textDecoration: "none",
-            cursor: "pointer"
-          }}
-        >
-          <span>📞 Call Frog Uncle</span>
-        </a>
-
-        <button
-          onClick={async () => {
-            const studentName = currentStudent?.name || "Student";
-            const studentId = currentStudent?.id || "";
-            const parentPhone = currentStudent?.phone || "0000000000";
-            const firstFour = studentName.replace(/[^a-zA-Z]/g, "").substring(0, 4).toUpperCase() || "STUD";
-            const lastFourPhone = parentPhone.slice(-4);
-            const uniqueHex = Math.floor(Math.random() * 0x10000).toString(16).padStart(4, "0").toUpperCase();
-            const txnId = `TN-${firstFour}-${lastFourPhone}-${uniqueHex}`;
-
-            try {
-              await LocalDB.createPaymentRecord({
-                txnId,
-                studentId,
-                studentName,
-                parentPhone,
-                amount: 49,
-                status: "pending",
-                createdAt: new Date().toISOString()
-              });
-            } catch (err) {
-              console.error("Failed to create payment record:", err);
-            }
-
-            const payUrl = `upi://pay?pa=Q668504716@ybl&am=49&cu=INR&tn=${encodeURIComponent(studentName + " tution Fee")}&tr=${txnId}`;
-            window.location.href = payUrl;
-          }}
-          className="btn"
-          style={{
-            width: "100%",
-            padding: "14px",
-            fontSize: "1.1rem",
-            fontWeight: "900",
-            backgroundColor: "#4f46e5",
-            borderColor: "#4338ca",
-            color: "#ffffff",
-            borderRadius: "16px",
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "8px",
-            boxShadow: "0 4px 0 #4338ca",
-            border: "none",
-            cursor: "pointer",
-            marginTop: "4px"
-          }}
-        >
-          <span>💳 Pay ₹49/month (Launch Offer)</span>
-        </button>
-
-        <div style={{ display: "flex", gap: "10px", width: "100%", marginTop: "8px" }}>
-          <button
-            onClick={() => setShowFrogModal(false)}
-            className="btn btn-gray"
-            style={{
-              width: "100%",
-              padding: "12px",
-              fontSize: "0.95rem",
-              fontWeight: "800"
-            }}
-          >
-            Not Now
-          </button>
-        </div>
-      </KidsModal>
+      />
 
       {/* 7. Try Premium for 7 days Trial Popup */}
-      <KidsModal
+      <TrialPopupModal
         isOpen={showTrialPopup}
         onClose={() => setShowTrialPopup(false)}
-        backgroundColor="#eff6ff"
-        borderColor="#3b82f6"
-        maxWidth="380px"
-        padding="32px 24px"
-        zIndex={10010}
-        style={{ boxShadow: "0 12px 24px rgba(59, 130, 246, 0.2)" }}
-      >
-        <div style={{ fontSize: "4.5rem", animation: "bounce 2s infinite" }}>🎁</div>
-
-        <h3 style={{ margin: 0, fontSize: "1.6rem", fontWeight: "900", color: "#1e3a8a" }}>
-          Try Premium Free! 🌟
-        </h3>
-
-        <p style={{ color: "#1e40af", fontSize: "1.05rem", fontWeight: "700", margin: 0, lineHeight: "1.5" }}>
-          Hey {currentStudent?.name || "there"}! <br />
-          Activate your <strong>7-Day Free Trial</strong> to play custom games, challenge friends, and see high scores!
-        </p>
-
-        <button
-          autoFocus
-          onClick={handleActivateTrial}
-          className="btn btn-success animate-tag-pulse"
-          style={{
-            width: "100%",
-            padding: "16px",
-            fontSize: "1.15rem",
-            fontWeight: "900",
-            backgroundColor: "#22c55e",
-            borderColor: "#16a34a",
-            color: "#ffffff",
-            borderRadius: "16px",
-            boxShadow: "0 4px 0 #16a34a",
-            cursor: "pointer",
-            border: "none"
-          }}
-        >
-          🚀 Start My 7-Day Trial!
-        </button>
-
-        <button
-          onClick={() => setShowTrialPopup(false)}
-          className="btn btn-gray"
-          style={{
-            width: "100%",
-            padding: "10px",
-            fontSize: "0.9rem",
-            fontWeight: "800"
-          }}
-        >
-          Maybe Later
-        </button>
-      </KidsModal>
+        onTrialActivated={fetchSocialData}
+        onShowSuccess={(msg) => {
+          setSocialSuccess(msg);
+          setTimeout(() => setSocialSuccess(""), 4000);
+        }}
+        onShowError={(msg) => {
+          setSocialError(msg);
+          setTimeout(() => setSocialError(""), 4000);
+        }}
+      />
     </div>
   );
 };
+
 export default Dashboard;
