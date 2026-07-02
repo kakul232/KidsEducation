@@ -20,13 +20,9 @@ import { ChallengeModal } from "./dashboard/ChallengeModal";
 import { FrogModal } from "./dashboard/FrogModal";
 import { TrialPopupModal } from "./dashboard/TrialPopupModal";
 
-import "./Dashboard.css";
+import { DIFFICULTY_SYMBOLS } from "../../utils/constants";
 
-const DIFFICULTY_SYMBOLS: Record<string, { symbol: string; label: string; color: string; bg: string }> = {
-  Easy: { symbol: "🌱", label: "Seedling", color: "#15803d", bg: "#d1fae5" },
-  Medium: { symbol: "🌿", label: "Sapling", color: "#c2410c", bg: "#ffedd5" },
-  Hard: { symbol: "🌳", label: "Big Tree", color: "#b91c1c", bg: "#fee2e2" }
-};
+import "./Dashboard.css";
 
 const parseGameTitle = (fullTitle: string) => {
   const emojiRegex = /^([\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F000}-\u{1F02F}]|[\u{1F0A0}-\u{1F0FF}]|[\u{1F100}-\u{1F64F}]|[\u{1F680}-\u{1F6FF}]|[\u{1F900}-\u{1F9FF}]|[\u{1FA00}-\u{1FAFF}]|[\u{2000}-\u{3300}])/u;

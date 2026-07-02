@@ -1,116 +1,231 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { CheckCircle, AlertTriangle } from "lucide-react";
+import LocalDB from "../../services/db";
 import type { Student } from "../../services/db";
+import { generateGame } from "../../services/gemini";
 import type { GeneratedGameResponse } from "../../services/gemini";
 import Sandbox from "../Sandbox";
+import { useApp } from "../../context/AppContext";
 
-const THEME_PRESETS = {
-  space: {
-    name: "Space Voyage 🌌",
-    prompt: "Use space travel theme, include colorful floating planets, count visual stars, astronaut guidance."
-  },
-  ocean: {
-    name: "Deep Sea 🐠",
-    prompt: "Deep sea background with colorful fish swimming, pop oxygen bubbles to count, submarine guidance."
-  },
-  dino: {
-    name: "Dino World 🦖",
-    prompt: "Dinosaur footprints and jungle theme, match correct counts to feed food to a happy baby T-Rex."
-  },
-  candy: {
-    name: "Candy Land 🍬",
-    prompt: "Delicious sweet candies and cupcakes theme, stack sweets or pop candy drops to answer math challenges."
-  },
-  custom: {
-    name: "Custom Theme 🪄",
-    prompt: ""
-  }
-};
+import { THEME_PRESETS } from "../../utils/constants";
+
 
 interface TabStudioProps {
-  editingGameId: string | null;
-  geminiApiKey: string;
-  handleCancelEdit: () => void;
-  assignedStudentId: string;
-  setAssignedStudentId: (val: string) => void;
+  editingGame: any;
+  onCancelEdit: () => void;
+  onPublishOrSave: () => void;
   students: Student[];
-  topic: string;
-  setTopic: (val: string) => void;
-  selectedClasses: string[];
-  setSelectedClasses: React.Dispatch<React.SetStateAction<string[]>>;
-  difficulty: "Easy" | "Medium" | "Hard";
-  setDifficulty: (val: "Easy" | "Medium" | "Hard") => void;
-  rounds: number | "infinite";
-  setRounds: (val: number | "infinite") => void;
-  aiTheme: "space" | "ocean" | "dino" | "candy" | "custom";
-  handleThemeChange: (theme: any) => void;
-  gameInstruction: string;
-  setGameInstruction: (val: string) => void;
-  handleAppendInstruction: (val: string) => void;
-  includeSound: boolean;
-  setIncludeSound: (val: boolean) => void;
-  dyslexiaTypography: boolean;
-  setDyslexiaTypography: (val: boolean) => void;
-  handleGenerate: () => void;
-  isGenerating: boolean;
-  generationError: string;
-  generatedGame: GeneratedGameResponse | null;
-  handleTitleChange: (val: string) => void;
-  codeEditMode: boolean;
-  setCodeEditMode: (val: boolean) => void;
-  handleSaveAsDraft: () => void;
-  handlePublish: () => void;
-  draftCode: string;
-  setDraftCode: (val: string) => void;
-  handleClearHtml: () => void;
-  tweakInstruction: string;
-  setTweakInstruction: (val: string) => void;
-  handleRegenerate: () => void;
 }
 
 export const TabStudio: React.FC<TabStudioProps> = ({
-  editingGameId,
-  geminiApiKey,
-  handleCancelEdit,
-  assignedStudentId,
-  setAssignedStudentId,
-  students,
-  topic,
-  setTopic,
-  selectedClasses,
-  setSelectedClasses,
-  difficulty,
-  setDifficulty,
-  rounds,
-  setRounds,
-  aiTheme,
-  handleThemeChange,
-  gameInstruction,
-  setGameInstruction,
-  handleAppendInstruction,
-  includeSound,
-  setIncludeSound,
-  dyslexiaTypography,
-  setDyslexiaTypography,
-  handleGenerate,
-  isGenerating,
-  generationError,
-  generatedGame,
-  handleTitleChange,
-  codeEditMode,
-  setCodeEditMode,
-  handleSaveAsDraft,
-  handlePublish,
-  draftCode,
-  setDraftCode,
-  handleClearHtml,
-  tweakInstruction,
-  setTweakInstruction,
-  handleRegenerate
+  editingGame,
+  onCancelEdit,
+  onPublishOrSave,
+  students
 }) => {
+  const { geminiApiKey, sendPushNotification } = useApp();
+
+  const [topic, setTopic] = useState("Addition");
+  const [selectedClasses, setSelectedClasses] = useState<string[]>(["Grade 1"]);
+  const [difficulty, setDifficulty] = useState<"Easy" | "Medium" | "Hard">("Easy");
+  const [assignedStudentId, setAssignedStudentId] = useState("");
+  const [gameInstruction, setGameInstruction] = useState(THEME_PRESETS.space.prompt);
+  const [aiTheme, setAiTheme] = useState<"space" | "ocean" | "dino" | "candy" | "custom">("space");
+  const [includeSound, setIncludeSound] = useState(true);
+  const [dyslexiaTypography, setDyslexiaTypography] = useState(false);
+  const [rounds, setRounds] = useState<number | "infinite">(5);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedGame, setGeneratedGame] = useState<GeneratedGameResponse | null>(null);
+  const [generationError, setGenerationError] = useState("");
+  const [editingGameId, setEditingGameId] = useState<string | null>(null);
+  const [tweakInstruction, setTweakInstruction] = useState("");
+  const [draftCode, setDraftCode] = useState("");
+  const [codeEditMode, setCodeEditMode] = useState(false);
+
+  useEffect(() => {
+    if (editingGame) {
+      setTopic(editingGame.topic);
+      if (editingGame.class) {
+        setSelectedClasses(editingGame.class.split(",").map((c: string) => c.trim()));
+      } else {
+        setSelectedClasses(["Grade 1"]);
+      }
+      setDifficulty(editingGame.difficulty);
+      setAssignedStudentId(editingGame.assignedStudentId || "");
+      setDraftCode(editingGame.htmlContent);
+      setGeneratedGame({
+        title: editingGame.title,
+        topic: editingGame.topic,
+        class: editingGame.class || "Grade 1",
+        difficulty: editingGame.difficulty,
+        htmlContent: editingGame.htmlContent,
+        promptUsed: "",
+        isValid: true,
+        errors: []
+      });
+      setEditingGameId(editingGame.id);
+      setCodeEditMode(true);
+      setGenerationError("");
+    } else {
+      setEditingGameId(null);
+      setGeneratedGame(null);
+      setDraftCode("");
+      setCodeEditMode(false);
+      setTopic("Addition");
+      setSelectedClasses(["Grade 1"]);
+      setDifficulty("Easy");
+      setAssignedStudentId("");
+      setGameInstruction(THEME_PRESETS.space.prompt);
+      setAiTheme("space");
+    }
+  }, [editingGame]);
+
+  const handleThemeChange = (themeKey: "space" | "ocean" | "dino" | "candy" | "custom") => {
+    setAiTheme(themeKey);
+    if (themeKey !== "custom") {
+      setGameInstruction(THEME_PRESETS[themeKey].prompt);
+    } else {
+      setGameInstruction("");
+    }
+  };
+
+  const handleAppendInstruction = (text: string) => {
+    setGameInstruction(prev => {
+      const cleanPrev = prev.trim();
+      if (!cleanPrev) return text;
+      if (cleanPrev.toLowerCase().includes(text.toLowerCase())) return prev;
+      return cleanPrev + ", " + text;
+    });
+  };
+
+  const handleGenerate = async () => {
+    if (!topic.trim()) return;
+    setIsGenerating(true);
+    setGeneratedGame(null);
+    setGenerationError("");
+    setCodeEditMode(false);
+
+    const combinedInstructions = [
+      `Theme/Style: ${THEME_PRESETS[aiTheme].name}`,
+      includeSound ? "Include visual audio feedback using HTML5 Web Audio API (AudioContext synth chimes) for correct and incorrect answers." : "Visual only feedback, do not write audio codes.",
+      dyslexiaTypography ? "Strictly apply dyslexia-friendly typography adjustments: use larger rounded fonts (like Lexend/Outfit or Comic Neue), set letter-spacing to at least 0.12em, line-height to 1.6, bold font-weight, mixed-case text, and reversal prevention underlines." : "Do NOT apply specialized dyslexia-friendly typography styling. Use regular default web typography (standard modern sans-serif fonts, default letter-spacing, normal weight).",
+      gameInstruction.trim()
+    ].filter(Boolean).join("\n• ");
+
+    try {
+      const result = await generateGame("Mathematics", topic, selectedClasses.join(", "), difficulty, geminiApiKey, combinedInstructions, rounds, undefined, dyslexiaTypography);
+      setGeneratedGame(result);
+      setDraftCode(result.htmlContent);
+    } catch (err: any) {
+      console.error(err);
+      setGenerationError(err.message || "Gemini AI generation failed. Verify API key and network.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleTitleChange = (newTitle: string) => {
+    if (!generatedGame) return;
+    setGeneratedGame({
+      ...generatedGame,
+      title: newTitle
+    });
+  };
+
+  const handleClearHtml = () => {
+    setDraftCode("");
+  };
+
+  const handleRegenerate = async () => {
+    if (!tweakInstruction.trim() || !draftCode.trim()) return;
+    setIsGenerating(true);
+    setGenerationError("");
+
+    const modifyInstructions = [
+      `Theme/Style: ${THEME_PRESETS[aiTheme].name}`,
+      includeSound ? "Include visual audio feedback using HTML5 Web Audio API (AudioContext synth chimes) for correct and incorrect answers." : "Visual only feedback, do not write audio codes.",
+      dyslexiaTypography ? "Strictly apply dyslexia-friendly typography adjustments: use larger rounded fonts (like Lexend/Outfit or Comic Neue), set letter-spacing to at least 0.12em, line-height to 1.6, bold font-weight, mixed-case text, and reversal prevention underlines." : "Do NOT apply specialized dyslexia-friendly typography styling. Use regular default web typography (standard modern sans-serif fonts, default letter-spacing, normal weight).",
+      gameInstruction.trim() ? `Base instructions: ${gameInstruction.trim()}` : "",
+      `REGENERATION REQUEST: Modify the existing HTML code according to this custom request: "${tweakInstruction.trim()}". Keep the rest of the game structures, logic, and sounds unchanged.`
+    ].filter(Boolean).join("\n• ");
+
+    try {
+      const result = await generateGame("Mathematics", topic, selectedClasses.join(", "), difficulty, geminiApiKey, modifyInstructions, rounds, draftCode, dyslexiaTypography);
+      setGeneratedGame(result);
+      setDraftCode(result.htmlContent);
+      setTweakInstruction("");
+    } catch (err: any) {
+      console.error(err);
+      setGenerationError(err.message || "Gemini AI regeneration failed.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handlePublish = async () => {
+    if (!generatedGame) return;
+
+    const newGame = {
+      id: editingGameId || ("game_" + Math.random().toString(36).substring(2, 11)),
+      title: generatedGame.title,
+      topic: generatedGame.topic,
+      subject: "Mathematics",
+      class: generatedGame.class || selectedClasses.join(", "),
+      difficulty: generatedGame.difficulty as any,
+      htmlContent: draftCode,
+      published: true,
+      createdAt: new Date().toISOString(),
+      assignedStudentId: assignedStudentId || ""
+    };
+
+    try {
+      await LocalDB.saveGame(newGame);
+      try {
+        await sendPushNotification(
+          "New Game Published! 🎮",
+          `A new math activity "${newGame.title}" is ready! Let's play and earn stars! ✨`
+        );
+      } catch (notiErr) {
+        console.warn("Could not trigger publish notification:", notiErr);
+      }
+      alert(editingGameId ? "Game successfully updated! ✏️" : "Game successfully published to students! 🎉");
+      onPublishOrSave();
+    } catch (err: any) {
+      console.error("Publish failed:", err);
+      alert("Failed to publish game: " + (err.message || "Unknown database error."));
+    }
+  };
+
+  const handleSaveAsDraft = async () => {
+    if (!generatedGame) return;
+
+    const newGame = {
+      id: editingGameId || ("game_" + Math.random().toString(36).substring(2, 11)),
+      title: generatedGame.title,
+      topic: generatedGame.topic,
+      subject: "Mathematics",
+      class: generatedGame.class || selectedClasses.join(", "),
+      difficulty: generatedGame.difficulty as any,
+      htmlContent: draftCode,
+      published: false,
+      createdAt: new Date().toISOString(),
+      assignedStudentId: assignedStudentId || ""
+    };
+
+    try {
+      await LocalDB.saveGame(newGame);
+      alert(editingGameId ? "Draft successfully updated! ✏️" : "Game successfully saved as Draft! 📁");
+      onPublishOrSave();
+    } catch (err: any) {
+      console.error("Save as Draft failed:", err);
+      alert("Failed to save draft: " + (err.message || "Unknown database error."));
+    }
+  };
+
+  const isKeyLive = geminiApiKey && geminiApiKey.trim().length > 0;
+
   return (
-    <div className="play-card" style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-      
+    <div className="play-card admin-card-flex">
       {/* Sparkling AI Header Banner */}
       <div className="ai-studio-header">
         <div>
@@ -120,52 +235,20 @@ export const TabStudio: React.FC<TabStudioProps> = ({
           <p style={{ fontSize: "0.85rem", color: "rgba(255, 255, 255, 0.9)", marginTop: "6px", marginBottom: "0px" }}>
             {editingGameId 
               ? "Modify and re-generate existing game details." 
-              : (geminiApiKey && geminiApiKey.trim().length > 0
+              : (isKeyLive
                   ? "Co-create visual, dyslexia-accessible arithmetic activities using Gemini AI." 
                   : "No API key saved. Creating a game will compile a simulated Balloon Counting template activity.")
             }
           </p>
-          <div
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "6px",
-              padding: "4px 10px",
-              borderRadius: "12px",
-              fontSize: "0.75rem",
-              fontWeight: "800",
-              marginTop: "10px",
-              backgroundColor: (geminiApiKey && geminiApiKey.trim().length > 0) ? "rgba(16, 185, 129, 0.25)" : "rgba(245, 158, 11, 0.25)",
-              color: (geminiApiKey && geminiApiKey.trim().length > 0) ? "#34d399" : "#fbbf24",
-              border: "1px solid",
-              borderColor: (geminiApiKey && geminiApiKey.trim().length > 0) ? "rgba(16, 185, 129, 0.4)" : "rgba(245, 158, 11, 0.4)"
-            }}
-          >
-            <span
-              style={{
-                width: "6px",
-                height: "6px",
-                borderRadius: "50%",
-                backgroundColor: (geminiApiKey && geminiApiKey.trim().length > 0) ? "#10b981" : "#fbbf24",
-                display: "inline-block"
-              }}
-            />
-            {(geminiApiKey && geminiApiKey.trim().length > 0) ? "Gemini Connected (Live Mode)" : "Using Mock Mode (No API Key)"}
+          <div className={`studio-connection-badge ${isKeyLive ? "connected" : "mock"}`}>
+            <span className="dot" />
+            {isKeyLive ? "Gemini Connected (Live Mode)" : "Using Mock Mode (No API Key)"}
           </div>
         </div>
         {editingGameId && (
           <button
-            onClick={handleCancelEdit}
-            className="btn"
-            style={{
-              padding: "8px 14px",
-              backgroundColor: "rgba(255, 255, 255, 0.2)",
-              border: "1.5px solid rgba(255, 255, 255, 0.4)",
-              color: "#fff",
-              borderRadius: "10px",
-              fontSize: "0.8rem",
-              boxShadow: "none"
-            }}
+            onClick={onCancelEdit}
+            className="btn studio-cancel-edit-btn"
           >
             Cancel Edit
           </button>
@@ -174,13 +257,13 @@ export const TabStudio: React.FC<TabStudioProps> = ({
 
       {/* AI Setup options Grid */}
       <div className="admin-form-grid">
-        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-          <label htmlFor="student-selector-studio" style={{ fontWeight: "700", fontSize: "0.9rem" }}>Select Student</label>
+        <div className="admin-form-group">
+          <label htmlFor="student-selector-studio" className="admin-login-label">Select Student</label>
           <select
             id="student-selector-studio"
             value={assignedStudentId}
             onChange={e => setAssignedStudentId(e.target.value)}
-            style={{ padding: "12px", borderRadius: "10px", border: "2px solid #cbd5e1" }}
+            className="admin-settings-input"
           >
             <option value="">All Students (General Publish)</option>
             {students.map(std => (
@@ -191,23 +274,23 @@ export const TabStudio: React.FC<TabStudioProps> = ({
           </select>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-          <label htmlFor="topic-input-studio" style={{ fontWeight: "700", fontSize: "0.9rem" }}>Select Topic</label>
+        <div className="admin-form-group">
+          <label htmlFor="topic-input-studio" className="admin-login-label">Select Topic</label>
           <input
             id="topic-input-studio"
             type="text"
             placeholder="e.g. Addition, Subtraction, Counting"
             value={topic}
             onChange={e => setTopic(e.target.value)}
-            style={{ padding: "12px", borderRadius: "10px", border: "2px solid #cbd5e1" }}
+            className="admin-settings-input"
           />
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-          <label style={{ fontWeight: "700", fontSize: "0.9rem" }}>Target Classes / Grades</label>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", marginTop: "4px", backgroundColor: "#fff", padding: "10px", borderRadius: "10px", border: "2px solid #cbd5e1" }}>
+        <div className="admin-form-group">
+          <label className="admin-login-label">Target Classes / Grades</label>
+          <div className="classes-checkboxes-wrapper">
             {["Preschool", "Kindergarten", "Grade 1", "Grade 2", "Grade 3", "Grade 4", "Grade 5", "Grade 6", "Grade 7"].map(cls => (
-              <label key={cls} style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "0.85rem", fontWeight: "600", cursor: "pointer" }}>
+              <label key={cls} className="class-checkbox-label">
                 <input
                   type="checkbox"
                   checked={selectedClasses.includes(cls)}
@@ -218,7 +301,6 @@ export const TabStudio: React.FC<TabStudioProps> = ({
                       setSelectedClasses(prev => prev.filter(c => c !== cls));
                     }
                   }}
-                  style={{ width: "16px", height: "16px" }}
                 />
                 {cls}
               </label>
@@ -226,13 +308,13 @@ export const TabStudio: React.FC<TabStudioProps> = ({
           </div>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-          <label htmlFor="difficulty-selector-studio" style={{ fontWeight: "700", fontSize: "0.9rem" }}>Difficulty</label>
+        <div className="admin-form-group">
+          <label htmlFor="difficulty-selector-studio" className="admin-login-label">Difficulty</label>
           <select
             id="difficulty-selector-studio"
             value={difficulty}
             onChange={e => setDifficulty(e.target.value as any)}
-            style={{ padding: "12px", borderRadius: "10px", border: "2px solid #cbd5e1" }}
+            className="admin-settings-input"
           >
             <option value="Easy">Easy</option>
             <option value="Medium">Medium</option>
@@ -240,13 +322,13 @@ export const TabStudio: React.FC<TabStudioProps> = ({
           </select>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-          <label htmlFor="rounds-selector-studio" style={{ fontWeight: "700", fontSize: "0.9rem" }}>Rounds Limit</label>
+        <div className="admin-form-group">
+          <label htmlFor="rounds-selector-studio" className="admin-login-label">Rounds Limit</label>
           <select
             id="rounds-selector-studio"
             value={rounds}
             onChange={e => setRounds(e.target.value === "infinite" ? "infinite" : Number(e.target.value))}
-            style={{ padding: "12px", borderRadius: "10px", border: "2px solid #cbd5e1" }}
+            className="admin-settings-input"
           >
             <option value={1}>1 Round</option>
             <option value={2}>2 Rounds</option>
@@ -264,8 +346,8 @@ export const TabStudio: React.FC<TabStudioProps> = ({
       </div>
 
       {/* AI Theme Presets Selector */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-        <span style={{ fontWeight: "700", fontSize: "0.95rem" }}>🎨 Select Game Creative Theme (AI Preset)</span>
+      <div className="admin-form-group">
+        <span className="admin-login-label">🎨 Select Game Creative Theme (AI Preset)</span>
         <div className="ai-theme-grid">
           {(Object.keys(THEME_PRESETS) as Array<keyof typeof THEME_PRESETS>).map((key) => {
             const preset = THEME_PRESETS[key];
@@ -285,8 +367,8 @@ export const TabStudio: React.FC<TabStudioProps> = ({
       </div>
 
       {/* Custom AI Instructions Box */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-        <label htmlFor="instruction-input-studio" style={{ fontWeight: "700", fontSize: "0.95rem" }}>
+      <div className="admin-form-group">
+        <label htmlFor="instruction-input-studio" className="admin-login-label">
           📝 Custom AI Prompts & Directives
         </label>
         <textarea
@@ -295,11 +377,11 @@ export const TabStudio: React.FC<TabStudioProps> = ({
           placeholder="Describe custom graphics, theme accents, or select quick suggestion pills below..."
           value={gameInstruction}
           onChange={e => setGameInstruction(e.target.value)}
-          style={{ padding: "12px", borderRadius: "10px", border: "2px solid #cbd5e1", resize: "vertical" }}
+          className="admin-settings-input"
         />
         
         {/* Quick Click Suggestion Pills */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "4px", marginTop: "4px" }}>
+        <div className="admin-form-group" style={{ marginTop: "4px" }}>
           <span style={{ fontSize: "0.75rem", fontWeight: "700", color: "var(--text-secondary)" }}>
             💡 Click to add specific directives to the prompt:
           </span>
@@ -327,37 +409,35 @@ export const TabStudio: React.FC<TabStudioProps> = ({
       </div>
 
       {/* Audio Feedback option */}
-      <div style={{ display: "flex", alignItems: "center", gap: "10px", backgroundColor: "#f8fafc", padding: "12px 18px", borderRadius: "16px", border: "1px solid #cbd5e1" }}>
+      <div className="studio-toggle-row">
         <input
           id="audio-toggle-studio"
           type="checkbox"
           checked={includeSound}
           onChange={e => setIncludeSound(e.target.checked)}
-          style={{ width: "20px", height: "20px", cursor: "pointer" }}
         />
-        <label htmlFor="audio-toggle-studio" style={{ fontWeight: "700", fontSize: "0.9rem", cursor: "pointer" }}>
+        <label htmlFor="audio-toggle-studio">
           🔊 Prompt AI to write HTML5 Audio Synth Feedback (Plays sounds on answers)
         </label>
       </div>
 
-      {/* Dyslexia-Friendly Typograph option */}
-      <div style={{ display: "flex", alignItems: "center", gap: "10px", backgroundColor: "#f8fafc", padding: "12px 18px", borderRadius: "16px", border: "1px solid #cbd5e1" }}>
+      {/* Dyslexia-Friendly Typography option */}
+      <div className="studio-toggle-row">
         <input
           id="typography-toggle-studio"
           type="checkbox"
           checked={dyslexiaTypography}
           onChange={e => setDyslexiaTypography(e.target.checked)}
-          style={{ width: "20px", height: "20px", cursor: "pointer" }}
         />
-        <label htmlFor="typography-toggle-studio" style={{ fontWeight: "700", fontSize: "0.9rem", cursor: "pointer" }}>
-          🔤 Dyslexia-Friendly Typograph (Rounded fonts, increased spacing, reversal cues)
+        <label htmlFor="typography-toggle-studio">
+          🔤 Dyslexia-Friendly Typography (Rounded fonts, increased spacing, reversal cues)
         </label>
       </div>
 
-      {/* Prompt Preview */}
-      <div style={{ padding: "14px", borderRadius: "16px", backgroundColor: "#f0fdf4", border: "1.5px solid #5eead4", fontSize: "0.8rem", display: "flex", flexDirection: "column", gap: "6px" }}>
-        <span style={{ fontWeight: "700", color: "#0f766e" }}>💡 Structured Guidelines Sent to AI model:</span>
-        <div style={{ color: "#0f766e", lineHeight: "1.4", fontFamily: "monospace", whiteSpace: "pre-wrap" }}>
+      {/* Structured Prompt Preview */}
+      <div className="studio-structured-preview-box">
+        <span>💡 Structured Guidelines Sent to AI model:</span>
+        <div className="content">
           • Theme/Style: {THEME_PRESETS[aiTheme].name}
           {"\n"}• Rounds: {rounds === "infinite" ? "Infinite loop of tasks (Continuous Play)" : `${rounds} Round(s) Limit`}
           {"\n"}• {includeSound ? "Include HTML5 Web Audio synth feedback tone generator." : "Visual only feedback, do not write audio codes."}
@@ -377,22 +457,7 @@ export const TabStudio: React.FC<TabStudioProps> = ({
       </button>
 
       {generationError && (
-        <div
-          style={{
-            marginTop: "16px",
-            padding: "14px 18px",
-            borderRadius: "14px",
-            backgroundColor: "#fee2e2",
-            border: "2px solid #ef4444",
-            color: "#b91c1c",
-            fontSize: "0.95rem",
-            fontWeight: "700",
-            display: "flex",
-            alignItems: "center",
-            gap: "10px",
-            lineHeight: "1.4"
-          }}
-        >
+        <div className="studio-generation-error-card">
           <span>⚠️</span>
           <span>{generationError}</span>
         </div>
@@ -400,33 +465,17 @@ export const TabStudio: React.FC<TabStudioProps> = ({
 
       {/* Generated Game Output & Sandbox */}
       {generatedGame && (
-        <div
-          style={{
-            marginTop: "20px",
-            borderTop: "2px solid #e2e8f0",
-            paddingTop: "20px",
-            display: "flex",
-            flexDirection: "column",
-            gap: "20px"
-          }}
-        >
-          <div style={{ display: "flex", flexDirection: "column", gap: "10px", width: "100%" }}>
+        <div className="studio-output-sandbox-wrapper">
+          <div className="admin-form-group" style={{ width: "100%" }}>
             <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "flex-end", gap: "16px" }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: "6px", flex: 1, minWidth: "250px" }}>
+              <div className="admin-form-group" style={{ flex: 1, minWidth: "250px" }}>
                 <label htmlFor="game-title-editable" style={{ fontSize: "0.85rem", fontWeight: "700" }}>Game Name</label>
                 <input
                   id="game-title-editable"
                   type="text"
                   value={generatedGame.title}
                   onChange={e => handleTitleChange(e.target.value)}
-                  style={{
-                    padding: "10px",
-                    borderRadius: "10px",
-                    border: "2px solid #cbd5e1",
-                    fontSize: "1rem",
-                    width: "100%",
-                    backgroundColor: "#fff"
-                  }}
+                  className="studio-editable-title-input"
                 />
               </div>
               <div style={{ display: "flex", gap: "8px" }}>
@@ -458,23 +507,13 @@ export const TabStudio: React.FC<TabStudioProps> = ({
           </div>
 
           {/* Safety & Validation Report */}
-          <div
-            style={{
-              padding: "14px",
-              borderRadius: "12px",
-              backgroundColor: generatedGame.isValid ? "#d1fae5" : "#fee2e2",
-              border: `1.5px solid ${generatedGame.isValid ? "#10b981" : "#ef4444"}`,
-              display: "flex",
-              gap: "10px",
-              alignItems: "flex-start"
-            }}
-          >
+          <div className={`studio-validation-report ${generatedGame.isValid ? "valid" : "invalid"}`}>
             {generatedGame.isValid ? (
               <>
                 <CheckCircle size={20} color="#047857" style={{ flexShrink: 0 }} />
                 <div>
-                  <span style={{ fontWeight: "700", color: "#065f46" }}>Game Code Validated!</span>
-                  <p style={{ fontSize: "0.8rem", color: "#065f46", marginTop: "2px" }}>
+                  <span className="title-valid">Game Code Validated!</span>
+                  <p className="desc-valid">
                     No dangerous browser APIs or external scripts detected. Ready to deploy.
                   </p>
                 </div>
@@ -483,8 +522,8 @@ export const TabStudio: React.FC<TabStudioProps> = ({
               <>
                 <AlertTriangle size={20} color="#b91c1c" style={{ flexShrink: 0 }} />
                 <div>
-                  <span style={{ fontWeight: "700", color: "#7f1d1d" }}>Security Validation Warnings</span>
-                  <ul style={{ fontSize: "0.8rem", color: "#7f1d1d", marginTop: "4px", paddingLeft: "16px" }}>
+                  <span className="title-invalid">Security Validation Warnings</span>
+                  <ul className="desc-invalid">
                     {generatedGame.errors.map((err, i) => (
                       <li key={i}>{err}</li>
                     ))}
@@ -497,7 +536,7 @@ export const TabStudio: React.FC<TabStudioProps> = ({
           {/* Edit Mode / Sandbox switch */}
           {codeEditMode ? (
             <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+              <div className="admin-overview-header" style={{ marginBottom: "6px" }}>
                 <label htmlFor="html-editor-textarea" style={{ fontSize: "0.85rem", fontWeight: "700" }}>
                   HTML/CSS/JS Source Code
                 </label>
@@ -514,22 +553,19 @@ export const TabStudio: React.FC<TabStudioProps> = ({
                             const trimmed = line.trim();
                             if (!trimmed) return;
                             
-                            // Decrease indent for closing braces/brackets
                             if (trimmed.startsWith('}') || trimmed.startsWith(']') || trimmed.startsWith(')')) {
                               indent = Math.max(baseIndent, indent - 1);
                             }
                             
                             formatted.push('  '.repeat(indent) + trimmed);
                             
-                            // Increase indent after opening braces/brackets
                             if (trimmed.endsWith('{') || trimmed.endsWith('[') || trimmed.endsWith('(')) {
                               indent++;
                             }
                             
-                            // Decrease indent after closing on same line
                             if ((trimmed.endsWith('}') || trimmed.endsWith(']') || trimmed.endsWith(')')) &&
                                 (trimmed.includes('{') || trimmed.includes('[') || trimmed.includes('('))) {
-                              // Do nothing, already handled
+                              // Already handled
                             } else if (trimmed.endsWith('}') || trimmed.endsWith(']') || trimmed.endsWith(')')) {
                               indent = Math.max(baseIndent, indent - 1);
                             }
@@ -555,15 +591,12 @@ export const TabStudio: React.FC<TabStudioProps> = ({
                             
                             if (trimmed.endsWith('{')) {
                               indent++;
-                            } else if (trimmed === '}') {
-                              // Already decreased above
                             }
                           });
                           
                           return formatted.join('\n');
                         };
                         
-                        // Main formatter
                         let result = '';
                         let htmlIndent = 0;
                         const parts = draftCode.split(/(<script[^>]*>|<\/script>|<style[^>]*>|<\/style>)/gi);
@@ -602,7 +635,6 @@ export const TabStudio: React.FC<TabStudioProps> = ({
                           } else if (inStyle) {
                             styleContent += part;
                           } else {
-                            // Format HTML
                             const tags = part.split(/(<[^>]+>)/g).filter(s => s.trim());
                             tags.forEach(tag => {
                               if (tag.startsWith('</')) {
@@ -626,62 +658,22 @@ export const TabStudio: React.FC<TabStudioProps> = ({
                         alert('Could not format document. Please check for syntax errors.');
                       }
                     }}
-                    className="btn"
-                    style={{
-                      padding: "4px 10px",
-                      backgroundColor: "#dbeafe",
-                      border: "1.5px solid #bfdbfe",
-                      color: "#1e40af",
-                      borderRadius: "8px",
-                      fontSize: "0.75rem",
-                      boxShadow: "none"
-                    }}
+                    className="btn editor-btn-format"
                   >
                     ✨ Format Document
                   </button>
                   <button
                     onClick={handleClearHtml}
-                    className="btn"
-                    style={{
-                      padding: "4px 10px",
-                      backgroundColor: "#fee2e2",
-                      border: "1.5px solid #fecaca",
-                      color: "#b91c1c",
-                      borderRadius: "8px",
-                      fontSize: "0.75rem",
-                      boxShadow: "none"
-                    }}
+                    className="btn editor-btn-clear"
                   >
                     🗑️ Clear All
                   </button>
                 </div>
               </div>
-              <div style={{
-                width: "100%",
-                height: "280px",
-                borderRadius: "10px",
-                border: "2px solid #cbd5e1",
-                backgroundColor: "#1e293b",
-                overflow: "hidden",
-                position: "relative"
-              }}>
-                <div style={{
-                  display: "flex",
-                  height: "100%"
-                }}>
+              <div className="editor-container">
+                <div className="editor-inner">
                   {/* Line Numbers */}
-                  <div style={{
-                    backgroundColor: "#0f172a",
-                    color: "#64748b",
-                    padding: "12px 8px",
-                    fontFamily: "monospace",
-                    fontSize: "0.85rem",
-                    lineHeight: "1.5",
-                    textAlign: "right",
-                    userSelect: "none",
-                    minWidth: "40px",
-                    borderRight: "1px solid #334155"
-                  }}>
+                  <div className="editor-line-numbers">
                     {draftCode.split('\n').map((_, i) => (
                       <div key={i}>{i + 1}</div>
                     ))}
@@ -692,23 +684,7 @@ export const TabStudio: React.FC<TabStudioProps> = ({
                     value={draftCode}
                     onChange={e => setDraftCode(e.target.value)}
                     spellCheck={false}
-                    style={{
-                      flex: 1,
-                      height: "100%",
-                      fontFamily: "'Consolas', 'Monaco', 'Courier New', monospace",
-                      fontSize: "0.85rem",
-                      padding: "12px",
-                      border: "none",
-                      backgroundColor: "#1e293b",
-                      color: "#e2e8f0",
-                      resize: "none",
-                      outline: "none",
-                      lineHeight: "1.5",
-                      tabSize: 2,
-                      whiteSpace: "pre",
-                      overflowWrap: "normal",
-                      overflowX: "auto"
-                    }}
+                    className="editor-textarea"
                     onKeyDown={(e) => {
                       if (e.key === 'Tab') {
                         e.preventDefault();
@@ -724,26 +700,14 @@ export const TabStudio: React.FC<TabStudioProps> = ({
                   />
                 </div>
                 {/* Editor Info Bar */}
-                <div style={{
-                  position: "absolute",
-                  bottom: 0,
-                  right: 0,
-                  backgroundColor: "#0f172a",
-                  color: "#64748b",
-                  padding: "4px 12px",
-                  fontSize: "0.75rem",
-                  fontFamily: "monospace",
-                  borderTopLeftRadius: "6px",
-                  borderLeft: "1px solid #334155",
-                  borderTop: "1px solid #334155"
-                }}>
+                <div className="editor-info-bar">
                   Lines: {draftCode.split('\n').length} | Chars: {draftCode.length}
                 </div>
               </div>
             </div>
           ) : (
             <div>
-              <span style={{ display: "block", fontSize: "0.85rem", fontWeight: "700", marginBottom: "4px" }}>
+              <span className="editor-sandbox-header">
                 Live Sandbox Sandbox Preview
               </span>
               <Sandbox
@@ -755,8 +719,8 @@ export const TabStudio: React.FC<TabStudioProps> = ({
           )}
 
           {/* Tweak & Regenerate section */}
-          <div style={{ marginTop: "20px", borderTop: "2px solid #cbd5e1", paddingTop: "20px", display: "flex", flexDirection: "column", gap: "10px" }}>
-            <label htmlFor="tweak-instructions-textarea" style={{ fontSize: "0.95rem", fontWeight: "700", display: "flex", alignItems: "center", gap: "6px" }}>
+          <div className="editor-tweak-section">
+            <label htmlFor="tweak-instructions-textarea" className="editor-tweak-label">
               🪄 Tweak & Re-generate Activity (Add custom modifications)
             </label>
             <textarea
@@ -765,13 +729,12 @@ export const TabStudio: React.FC<TabStudioProps> = ({
               placeholder="e.g. Change background color to neon green, or make interactive elements 20% larger..."
               value={tweakInstruction}
               onChange={e => setTweakInstruction(e.target.value)}
-              style={{ padding: "12px", borderRadius: "10px", border: "2px solid #cbd5e1", fontSize: "0.85rem", resize: "vertical" }}
+              className="editor-tweak-textarea"
             />
             <button
               onClick={handleRegenerate}
               disabled={isGenerating || !tweakInstruction.trim()}
-              className="btn btn-primary"
-              style={{ alignSelf: "flex-start", padding: "10px 20px", fontSize: "0.85rem" }}
+              className="btn btn-primary editor-tweak-btn"
             >
               {isGenerating ? "AI Regenerating..." : "Apply Tweaks & Regenerate Code"}
             </button>

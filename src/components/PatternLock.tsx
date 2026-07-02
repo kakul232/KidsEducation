@@ -10,19 +10,8 @@ interface PatternLockProps {
   errorMessage?: string;
 }
 
-const DOT_COORDS = [
-  { x: 50, y: 50 },   // 0
-  { x: 150, y: 50 },  // 1
-  { x: 250, y: 50 },  // 2
-  { x: 50, y: 150 },  // 3
-  { x: 150, y: 150 }, // 4
-  { x: 250, y: 150 }, // 5
-  { x: 50, y: 250 },  // 6
-  { x: 150, y: 250 }, // 7
-  { x: 250, y: 250 }  // 8
-];
+import { DOT_COORDS, COLLISION_RADIUS } from "../utils/constants";
 
-const COLLISION_RADIUS = 26; // px radius to trigger dot selection
 
 export const PatternLock: React.FC<PatternLockProps> = ({
   mode,

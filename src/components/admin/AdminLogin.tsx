@@ -1,104 +1,93 @@
-import React from "react";
+import React, { useState } from "react";
 import { Lock } from "lucide-react";
 import KidsLoader from "../KidsLoader";
+import { useApp } from "../../context/AppContext";
 
-interface AdminLoginProps {
-  isAuthLoading: boolean;
-  email: string;
-  setEmail: (val: string) => void;
-  password: string;
-  setPassword: (val: string) => void;
-  authError: string;
-  handleLogin: (e: React.FormEvent) => void;
-  setView: (view: any) => void;
-}
+export const AdminLogin: React.FC = () => {
+  const { logInAdmin, setView } = useApp();
 
-export const AdminLogin: React.FC<AdminLoginProps> = ({
-  isAuthLoading,
-  email,
-  setEmail,
-  password,
-  setPassword,
-  authError,
-  handleLogin,
-  setView
-}) => {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [authError, setAuthError] = useState("");
+  const [isAuthLoading, setIsAuthLoading] = useState(false);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password) {
+      setAuthError("Please fill in all fields.");
+      return;
+    }
+    setAuthError("");
+    setIsAuthLoading(true);
+    try {
+      await logInAdmin(email, password);
+    } catch (err: any) {
+      if (
+        err.code === "auth/invalid-credential" ||
+        err.code === "auth/user-not-found" ||
+        err.code === "auth/wrong-password"
+      ) {
+        setAuthError("Invalid credentials. Please verify your email and password.");
+      } else {
+        setAuthError(err.message || "Authentication failed. Try again.");
+      }
+      setIsAuthLoading(false);
+    }
+  };
+
   return (
-    <div className="container animate-slide-up" style={{ justifyContent: "center" }}>
+    <div className="container admin-login-container animate-slide-up">
       {isAuthLoading && <KidsLoader />}
-      <div className="play-card" style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-        <div style={{ textAlign: "center" }}>
-          <div
-            style={{
-              display: "inline-flex",
-              backgroundColor: "var(--accent-primary)",
-              color: "#fff",
-              borderRadius: "50%",
-              width: "60px",
-              height: "60px",
-              alignItems: "center",
-              justifyContent: "center",
-              marginBottom: "12px"
-            }}
-          >
+      <div className="play-card admin-login-card">
+        <div className="admin-login-header">
+          <div className="admin-login-lock-circle">
             <Lock size={30} />
           </div>
-          <h2 style={{ fontSize: "1.5rem" }}>Admin Portal Login</h2>
-          <p style={{ color: "var(--text-secondary)", fontSize: "0.95rem" }}>
+          <h2 className="admin-login-title">Admin Portal Login</h2>
+          <p className="admin-login-subtitle">
             Secure authentication for educators & administrators
           </p>
         </div>
 
-        <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-            <label htmlFor="admin-email-field" style={{ fontWeight: "700", fontSize: "0.9rem" }}>Email Address</label>
+        <form onSubmit={handleLogin} className="admin-login-form">
+          <div className="admin-login-form-group">
+            <label htmlFor="admin-email-field" className="admin-login-label">Email Address</label>
             <input
               id="admin-email-field"
               type="email"
               placeholder="teacher@school.com"
               value={email}
               onChange={e => setEmail(e.target.value)}
-              style={{
-                padding: "14px",
-                fontSize: "1rem",
-                borderRadius: "12px",
-                border: "2px solid #cbd5e1"
-              }}
+              className="admin-login-input"
             />
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-            <label htmlFor="admin-pass-field" style={{ fontWeight: "700", fontSize: "0.9rem" }}>Password</label>
+          <div className="admin-login-form-group">
+            <label htmlFor="admin-pass-field" className="admin-login-label">Password</label>
             <input
               id="admin-pass-field"
               type="password"
               placeholder="••••••••"
               value={password}
               onChange={e => setPassword(e.target.value)}
-              style={{
-                padding: "14px",
-                fontSize: "1rem",
-                borderRadius: "12px",
-                border: "2px solid #cbd5e1"
-              }}
+              className="admin-login-input"
             />
           </div>
 
           {authError && (
-            <span style={{ color: "var(--accent-primary)", fontWeight: "600", fontSize: "0.95rem" }}>
+            <span className="admin-login-error">
               {authError}
             </span>
           )}
 
-          <button type="submit" className="btn btn-primary" style={{ padding: "16px" }}>
+          <button type="submit" className="btn btn-primary admin-login-submit">
             Log In to Portal
           </button>
         </form>
 
         <button
           onClick={() => setView("onboarding")}
-          className="btn btn-gray"
-          style={{ padding: "10px", fontSize: "0.9rem", boxShadow: "none" }}
+          className="btn btn-gray admin-login-back"
         >
           Back to Student Screen
         </button>

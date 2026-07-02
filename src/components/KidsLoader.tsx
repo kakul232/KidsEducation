@@ -1,25 +1,7 @@
 import React, { useState, useEffect } from "react";
 
-const LOADING_MESSAGES = [
-  "🐸 Hopper the frog is jumping to get your game...",
-  "🎨 Painting the canvas with beautiful colors...",
-  "🎈 Blowing up shiny balloons for counting...",
-  "✨ Adding a dash of magic math dust...",
-  "💫 Gathering bright, happy stars...",
-  "🦖 Prepping the code dinosaur for lift-off...",
-  "🚀 Coding rocket is blasting into space...",
-  "🍦 Scooping up some cool learning ice cream..."
-];
+import { LOADING_MESSAGES, BUBBLES } from "../utils/constants";
 
-// Helper to generate floating bubble metadata
-const BUBBLES = Array.from({ length: 12 }, (_, i) => ({
-  id: i,
-  size: Math.floor(Math.random() * 40) + 20, // 20px to 60px
-  left: `${Math.floor(Math.random() * 90) + 5}%`,
-  delay: `${i * 0.7}s`,
-  duration: `${Math.floor(Math.random() * 4) + 6}s`, // 6s to 10s
-  color: ["#fecdd3", "#fef9c3", "#d1fae5", "#e0f2fe", "#f3e8ff", "#ffedd5"][i % 6]
-}));
 
 export const KidsLoader: React.FC = () => {
   const [messageIndex, setMessageIndex] = useState(0);

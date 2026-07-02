@@ -1,26 +1,100 @@
 import React from "react";
 import { Unlock, Lock, Eye, EyeOff, Edit2, Trash2 } from "lucide-react";
+import LocalDB from "../../services/db";
 import type { Game } from "../../services/db";
+import { useApp } from "../../context/AppContext";
 
 interface TabAllGamesProps {
   games: Game[];
-  handleSaveGameOrder: (id: string, order: number) => void;
-  handleSaveGameStarsRequired: (id: string, stars: number) => void;
-  handleToggleGameTier: (game: Game) => void;
-  handleTogglePublish: (game: Game) => void;
-  handleEditGame: (game: Game) => void;
-  handleDeleteGame: (id: string) => void;
+  onEditGame: (game: Game) => void;
+  onRefresh: () => void;
 }
 
 export const TabAllGames: React.FC<TabAllGamesProps> = ({
   games,
-  handleSaveGameOrder,
-  handleSaveGameStarsRequired,
-  handleToggleGameTier,
-  handleTogglePublish,
-  handleEditGame,
-  handleDeleteGame
+  onEditGame,
+  onRefresh
 }) => {
+  const { sendPushNotification } = useApp();
+
+  const handleSaveGameOrder = async (gameId: string, orderVal: number) => {
+    try {
+      const game = games.find(g => g.id === gameId);
+      if (!game) return;
+
+      const updated = {
+        ...game,
+        order: isNaN(orderVal) ? 0 : orderVal
+      };
+      await LocalDB.saveGame(updated);
+      onRefresh();
+    } catch (err: any) {
+      console.error("Failed to save game order:", err);
+    }
+  };
+
+  const handleSaveGameStarsRequired = async (gameId: string, starsVal: number) => {
+    try {
+      const game = games.find(g => g.id === gameId);
+      if (!game) return;
+
+      const updated = {
+        ...game,
+        starsRequired: isNaN(starsVal) ? 0 : starsVal
+      };
+      await LocalDB.saveGame(updated);
+      onRefresh();
+    } catch (err: any) {
+      console.error("Failed to save game star requirement:", err);
+    }
+  };
+
+  const handleToggleGameTier = async (game: Game) => {
+    try {
+      const updated = {
+        ...game,
+        isFree: game.isFree === false ? true : false
+      };
+      await LocalDB.saveGame(updated);
+      alert(`Updated game "${game.title}" to ${updated.isFree ? "🆓 Free" : "💎 Paid/Premium"}`);
+      onRefresh();
+    } catch (err: any) {
+      console.error("Failed to toggle game tier:", err);
+      alert("Error updating game tier.");
+    }
+  };
+
+  const handleTogglePublish = async (game: Game) => {
+    const updated = {
+      ...game,
+      published: !game.published
+    };
+    try {
+      await LocalDB.saveGame(updated);
+      onRefresh();
+
+      if (updated.published) {
+        try {
+          await sendPushNotification(
+            "New Game Published! 🎮",
+            `A new math activity "${updated.title}" is ready! Let's play and earn stars! ✨`
+          );
+        } catch (notiErr) {
+          console.warn("Could not trigger toggle publish notification:", notiErr);
+        }
+      }
+    } catch (e: any) {
+      alert("Failed to toggle publish status: " + e.message);
+    }
+  };
+
+  const handleDeleteGame = async (id: string) => {
+    if (confirm("Are you sure you want to delete this game?")) {
+      await LocalDB.deleteGame(id);
+      onRefresh();
+    }
+  };
+
   return (
     <div className="play-card">
       <h3 style={{ fontSize: "1.1rem", marginBottom: "16px" }}>Active Subject Activities</h3>
@@ -33,28 +107,10 @@ export const TabAllGames: React.FC<TabAllGamesProps> = ({
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                   <span style={{ fontWeight: "700", fontSize: "1.05rem" }}>{game.title}</span>
-                  <span
-                    style={{
-                      fontSize: "0.7rem",
-                      backgroundColor: game.published ? "#d1fae5" : "#e2e8f0",
-                      color: game.published ? "#065f46" : "#475569",
-                      padding: "2px 8px",
-                      borderRadius: "6px",
-                      fontWeight: "800"
-                    }}
-                  >
+                  <span className={`game-badge ${game.published ? "published" : "draft"}`}>
                     {game.published ? "Published" : "Draft / Hidden"}
                   </span>
-                  <span
-                    style={{
-                      fontSize: "0.7rem",
-                      backgroundColor: game.isFree !== false ? "#f1f5f9" : "#fee2e2",
-                      color: game.isFree !== false ? "#475569" : "#991b1b",
-                      padding: "2px 8px",
-                      borderRadius: "6px",
-                      fontWeight: "800"
-                    }}
-                  >
+                  <span className={`game-badge ${game.isFree !== false ? "free" : "premium"}`}>
                     {game.isFree !== false ? "🆓 Free" : "💎 Premium"}
                   </span>
                 </div>
@@ -75,14 +131,7 @@ export const TabAllGames: React.FC<TabAllGamesProps> = ({
                       type="number"
                       defaultValue={game.order || 0}
                       onBlur={(e) => handleSaveGameOrder(game.id, parseInt(e.target.value))}
-                      style={{
-                        width: "55px",
-                        padding: "2px 4px",
-                        borderRadius: "6px",
-                        border: "1.5px solid #cbd5e1",
-                        fontSize: "0.7rem",
-                        textAlign: "center"
-                      }}
+                      className="admin-game-number-input order"
                     />
                   </div>
                   <span>•</span>
@@ -92,14 +141,7 @@ export const TabAllGames: React.FC<TabAllGamesProps> = ({
                       type="number"
                       defaultValue={game.starsRequired || 0}
                       onBlur={(e) => handleSaveGameStarsRequired(game.id, parseInt(e.target.value))}
-                      style={{
-                        width: "65px",
-                        padding: "2px 4px",
-                        borderRadius: "6px",
-                        border: "1.5px solid #cbd5e1",
-                        fontSize: "0.7rem",
-                        textAlign: "center"
-                      }}
+                      className="admin-game-number-input stars"
                     />
                   </div>
                 </div>
@@ -108,14 +150,7 @@ export const TabAllGames: React.FC<TabAllGamesProps> = ({
               <div className="admin-game-actions" style={{ flexWrap: "wrap", gap: "8px" }}>
                 <button
                   onClick={() => handleToggleGameTier(game)}
-                  className="btn"
-                  style={{
-                    padding: "8px",
-                    backgroundColor: game.isFree !== false ? "#f1f5f9" : "#fee2e2",
-                    color: game.isFree !== false ? "#64748b" : "#991b1b",
-                    borderRadius: "10px",
-                    boxShadow: "none"
-                  }}
+                  className={`btn admin-game-action-btn ${game.isFree !== false ? "free" : "premium"}`}
                   title={game.isFree !== false ? "Make Paid/Premium" : "Make Free"}
                 >
                   {game.isFree !== false ? <Unlock size={18} /> : <Lock size={18} />}
@@ -123,29 +158,15 @@ export const TabAllGames: React.FC<TabAllGamesProps> = ({
 
                 <button
                   onClick={() => handleTogglePublish(game)}
-                  className="btn"
-                  style={{
-                    padding: "8px",
-                    backgroundColor: game.published ? "#d1fae5" : "#f1f5f9",
-                    color: game.published ? "#10b981" : "#64748b",
-                    borderRadius: "10px",
-                    boxShadow: "none"
-                  }}
+                  className={`btn admin-game-action-btn ${game.published ? "published" : "draft"}`}
                   title={game.published ? "Unpublish Activity" : "Publish Activity"}
                 >
                   {game.published ? <Eye size={18} /> : <EyeOff size={18} />}
                 </button>
 
                 <button
-                  onClick={() => handleEditGame(game)}
-                  className="btn"
-                  style={{
-                    padding: "8px",
-                    backgroundColor: "#e0f2fe",
-                    color: "#0284c7",
-                    borderRadius: "10px",
-                    boxShadow: "none"
-                  }}
+                  onClick={() => onEditGame(game)}
+                  className="btn admin-game-action-btn edit"
                   title="Edit game details & code"
                 >
                   <Edit2 size={18} />
@@ -153,14 +174,7 @@ export const TabAllGames: React.FC<TabAllGamesProps> = ({
 
                 <button
                   onClick={() => handleDeleteGame(game.id)}
-                  className="btn"
-                  style={{
-                    padding: "8px",
-                    backgroundColor: "#fee2e2",
-                    color: "#ef4444",
-                    borderRadius: "10px",
-                    boxShadow: "none"
-                  }}
+                  className="btn admin-game-action-btn delete"
                   title="Delete game"
                 >
                   <Trash2 size={18} />
